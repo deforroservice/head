@@ -148,8 +148,14 @@ Files are never uploaded anywhere.
 
 * `web/engine.js`: JavaScript port of the loaders, validation, SOAP builder, mock and uploader
 * `web/sandbox.html`: the page (the engine is inlined at build time)
-* `python web/build.py` writes `web/dist/deforro-dds-sandbox.html`, which you can open
-  from disk or publish
+* `python web/build.py` writes `docs/index.html` (the public page, served by GitHub Pages
+  from the `/docs` folder; it can download the CSV template and results) and
+  `web/dist/deforro-dds-sandbox.html` (a body-only build for embedded previews, which copies
+  to the clipboard instead of downloading)
+
+The public page is marked `noindex` and works for anyone who has the link. It never sends
+data anywhere, so there is nothing to protect server-side. Rebuild and commit `docs/`
+after changing `web/`; `tests/test_web_build.py` fails if it is stale.
 
 `tests/test_web_parity.py` runs the JavaScript engine under Node against the same inputs
 as this package: validation outcomes on 30 edge cases and 400 generated records, the CSV

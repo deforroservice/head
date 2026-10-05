@@ -214,6 +214,7 @@ footer b { color: #d6e5dd; font-weight: 500; }
 <script>
 /*ENGINE*/
 </script>
+<script>/*SITE*/</script>
 <script>
 (() => {
   "use strict";
@@ -245,6 +246,17 @@ footer b { color: #d6e5dd; font-weight: 500; }
   ].join("\n");
 
   let sandbox = null, open = null, filing = false, pollTimer = null;
+  // Hosted builds can download files; the embedded preview build cannot, so it copies to the clipboard instead.
+  const SITE = window.DEFORRO_SITE === true;
+  if (SITE) { $("template").textContent = "Download CSV template"; $("copy").textContent = "Download results"; }
+
+  function download(name, text, msgEl, done) {
+    const url = URL.createObjectURL(new Blob([text], { type: "text/csv;charset=utf-8" }));
+    const a = Object.assign(document.createElement("a"), { href: url, download: name });
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    msgEl.textContent = done; msgEl.style.color = "var(--mint)";
+  }
 
   // ------------------------------------------------------------ load
 
@@ -438,7 +450,9 @@ footer b { color: #d6e5dd; font-weight: 500; }
   // ------------------------------------------------------------ events
 
   $("sample").addEventListener("click", loadSample);
-  $("template").addEventListener("click", () => copy(TEMPLATE, $("loadMsg"), "CSV template copied. Paste it into a spreadsheet, one row per plot.", $("csvBox")));
+  $("template").addEventListener("click", () => SITE
+    ? download("deforro-shipments-template.csv", TEMPLATE, $("loadMsg"), "Template downloaded. Fill in one row per plot.")
+    : copy(TEMPLATE, $("loadMsg"), "CSV template copied. Paste it into a spreadsheet, one row per plot.", $("csvBox")));
   $("file").addEventListener("change", (e) => { loadFiles(e.target.files); e.target.value = ""; });
   const drop = $("drop");
   ["dragenter", "dragover"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add("over"); }));
@@ -446,7 +460,9 @@ footer b { color: #d6e5dd; font-weight: 500; }
   drop.addEventListener("drop", (e) => loadFiles(e.dataTransfer.files));
   $("fileBtn").addEventListener("click", fileAll);
   $("onlyProblems").addEventListener("change", renderRows);
-  $("copy").addEventListener("click", () => copy(resultsCsv(), $("copyMsg"), `${fmt.format(all().length)} rows copied as CSV.`, $("csvBox")));
+  $("copy").addEventListener("click", () => SITE
+    ? download(`dds-results-${new Date().toISOString().slice(0, 10)}.csv`, resultsCsv(), $("copyMsg"), `${fmt.format(all().length)} rows downloaded.`)
+    : copy(resultsCsv(), $("copyMsg"), `${fmt.format(all().length)} rows copied as CSV.`, $("csvBox")));
   const toggleRow = (tr) => { if (!tr) return; open = open === tr.dataset.ref ? null : tr.dataset.ref; renderRows(); };
   $("rows").addEventListener("click", (e) => {
     if (e.target.closest("[data-act]")) {

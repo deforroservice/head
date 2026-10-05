@@ -1,0 +1,1473 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="DEFORRO sandbox: check a shipment export against EUDR rules and file it to a simulated TRACES.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230c3a2b'/%3E%3Cpath d='M9 22c0-8 6-13 14-13-1 8-6 13-14 13z' fill='%238de2bd'/%3E%3C/svg%3E">
+<style>body{margin:0}[hidden]{display:none!important}</style>
+<title>DEFORRO DDS Sandbox</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800;900&family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one narrow column, three steps (Load, Check, File) and a results list.
+   Colour carries status everywhere: mint ready/filed, amber fix data, coral risk/rejected, sky waiting. */
+:root {
+  color-scheme: dark;
+  --bg: #0c3a2b;
+  --bg-deep: #082c20;
+  --raise: #0f4231;
+  --line: rgba(205, 236, 219, 0.14);
+  --ink: #f3f7f2;
+  --muted: #a3bfb1;
+  --mint: #8de2bd;
+  --amber: #f39a4b;
+  --coral: #ef7564;
+  --sky: #9ccbe8;
+  --display: "Archivo", "Arial Black", "Helvetica Neue", Arial, sans-serif;
+  --body: "Public Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--body); }
+.wrap { max-width: 780px; margin: 0 auto; padding-inline: 20px; }
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--mint); outline-offset: 2px; }
+
+/* top */
+.top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding-block: 20px; }
+.brand { font: 900 17px var(--display); letter-spacing: .06em; }
+.badge { font: 500 11.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--amber); border: 1px solid rgba(243,154,75,.45); border-radius: 999px; padding: 5px 11px; display: inline-flex; gap: 8px; align-items: center; }
+.badge::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--amber); }
+.intro { padding-block: 26px 8px; }
+h1 { font: 900 clamp(30px, 5.4vw, 46px)/1.02 var(--display); text-transform: uppercase; margin: 0 0 12px; text-wrap: balance; }
+h1 em { font-style: normal; color: var(--mint); }
+.intro p { margin: 0; color: #d6e5dd; max-width: 58ch; }
+.intro p.promise { display: flex; gap: 9px; align-items: center; margin-top: 12px; font-size: 13.5px; color: var(--muted); }
+.promise svg { flex: none; width: 15px; height: 15px; stroke: var(--mint); fill: none; stroke-width: 1.8; }
+
+/* steps */
+.step { padding-block: 26px; border-top: 1px solid var(--line); }
+#s1 { margin-top: 22px; }
+.step-h { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.dot { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--line); display: grid; place-items: center; font: 600 11px var(--mono); color: var(--muted); flex: none; }
+.step.done .dot { background: var(--mint); border-color: var(--mint); color: var(--bg-deep); }
+h2 { font: 800 15px var(--display); text-transform: uppercase; letter-spacing: .08em; margin: 0; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+
+.drop { display: flex; align-items: center; gap: 14px; border: 1.5px dashed rgba(141,226,189,.4); border-radius: 12px; padding: 16px 18px; cursor: pointer; transition: background .15s; }
+.drop:hover, .drop.over { background: rgba(141,226,189,.06); }
+.drop svg { flex: none; width: 26px; height: 26px; stroke: var(--mint); fill: none; stroke-width: 1.6; }
+.drop strong { font-weight: 600; }
+.drop span { min-width: 0; }
+.links { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; font-size: 13.5px; }
+.link { background: none; border: 0; padding: 0; color: var(--mint); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: rgba(141,226,189,.4); }
+.link:hover { text-decoration-color: var(--mint); }
+.loaded { margin-top: 12px; font: 500 13.5px var(--mono); overflow-wrap: anywhere; }
+.msg { font-size: 13px; color: var(--amber); margin-top: 8px; }
+.msg:empty { display: none; }
+
+/* check */
+.verdict { font: 800 clamp(24px, 4vw, 32px)/1.15 var(--display); margin: 0 0 14px; text-wrap: balance; }
+.verdict b { color: var(--mint); font-weight: 900; }
+.split { display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: rgba(205,236,219,.1); gap: 2px; }
+.split i { display: block; height: 100%; transition: width .3s; }
+.c-ready { background: var(--mint); } .c-fix { background: var(--amber); } .c-risk { background: var(--coral); } .c-wait { background: var(--sky); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 20px; margin-top: 9px; font-size: 13px; color: #d6e5dd; }
+.legend span { display: inline-flex; align-items: center; gap: 7px; }
+.legend span::before { content: ""; width: 9px; height: 9px; border-radius: 2px; background: var(--c); }
+.legend b { font: 500 13px var(--mono); }
+.problems { list-style: none; padding: 0; margin: 18px 0 0; display: grid; gap: 8px; }
+.problems li { display: flex; gap: 12px; font-size: 14px; padding-bottom: 8px; border-bottom: 1px solid rgba(205,236,219,.07); }
+.problems li::before { content: ""; flex: none; width: 3px; border-radius: 2px; background: var(--c, var(--amber)); align-self: stretch; }
+.problems li span { flex: 1; }
+.problems b { font: 500 13.5px var(--mono); font-variant-numeric: tabular-nums; }
+details { margin-top: 14px; }
+summary { cursor: pointer; font-size: 13.5px; color: var(--mint); width: fit-content; }
+.rules { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 7px; font-size: 13.5px; }
+.rules li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; }
+.rules small { font: 12px var(--mono); color: var(--muted); white-space: nowrap; }
+
+/* file */
+.file-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.primary { background: var(--mint); color: var(--bg-deep); border: 0; border-radius: 999px; padding: 12px 22px; font-weight: 700; font-size: 15px; cursor: pointer; }
+.primary:hover:not(:disabled) { background: #a9ecd0; }
+.primary:disabled { opacity: .4; cursor: not-allowed; }
+.outcome { font-size: 14px; color: #d6e5dd; flex: 1; min-width: 220px; }
+.outcome b { font-family: var(--mono); font-weight: 600; }
+#fileBar { margin-top: 16px; }
+
+/* results */
+.res-h { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; cursor: pointer; }
+.toggle input { accent-color: var(--mint); width: 16px; height: 16px; }
+.ghost { background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px; font-size: 13.5px; cursor: pointer; }
+.ghost:hover:not(:disabled) { border-color: var(--mint); color: var(--mint); }
+.ghost:disabled { opacity: .4; cursor: not-allowed; }
+.list { max-height: 520px; overflow: auto; border: 1px solid var(--line); border-radius: 12px; }
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 520px; }
+th { text-align: left; font: 500 10.5px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); padding: 10px 14px; background: var(--bg-deep); position: sticky; top: 0; z-index: 1; }
+td { padding: 9px 14px; border-top: 1px solid rgba(205,236,219,.07); }
+tr.item { cursor: pointer; }
+tr.item:hover { background: rgba(141,226,189,.05); }
+tr.item.open { background: rgba(141,226,189,.09); }
+td.code { font-family: var(--mono); font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+.st { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; white-space: nowrap; }
+.st::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+.empty { padding: 26px 14px; text-align: center; color: var(--muted); }
+tr.more td { background: var(--raise); padding: 14px 18px 18px; }
+.why { margin: 0; display: grid; gap: 6px; font-size: 14px; }
+.why small { display: block; font: 12px var(--mono); color: var(--muted); overflow-wrap: anywhere; }
+.nums { display: flex; flex-wrap: wrap; gap: 8px 28px; align-items: end; }
+.nums div { display: flex; flex-direction: column; }
+.nums span { font: 500 10.5px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.nums b { font: 600 18px var(--mono); color: var(--mint); letter-spacing: .03em; }
+.meta { font-size: 13px; color: var(--muted); margin-top: 10px; }
+.trail { list-style: none; padding: 0; margin: 10px 0 0; display: flex; flex-wrap: wrap; gap: 4px 8px; font-size: 12.5px; color: #d6e5dd; }
+.trail li { display: inline-flex; gap: 6px; }
+.trail time { font-family: var(--mono); color: var(--muted); }
+.trail li + li::before { content: "→"; color: var(--muted); margin-right: 2px; }
+pre.xml { margin: 8px 0 0; max-height: 300px; overflow: auto; background: var(--bg-deep); border: 1px solid var(--line); border-radius: 8px; padding: 12px; font: 11.5px/1.5 var(--mono); color: #cfe3d8; white-space: pre; }
+textarea { width: 100%; height: 110px; margin-top: 10px; background: var(--bg-deep); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; font: 12px var(--mono); padding: 10px; }
+
+footer { margin-top: 30px; border-top: 1px solid var(--line); padding-block: 18px 30px; display: flex; justify-content: space-between; gap: 8px 20px; flex-wrap: wrap; font: 12px/1.6 var(--mono); color: var(--muted); }
+footer b { color: #d6e5dd; font-weight: 500; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="top">
+    <div class="brand">DEFORRO</div>
+    <div class="badge">Sandbox · simulated EU Information System</div>
+  </div>
+
+  <div class="intro">
+    <h1>File due diligence <em>statements</em></h1>
+    <p>Check a shipment export against EUDR rules and file it to a simulated TRACES, the way DEFORRO does in production.</p>
+    <p class="promise"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6l7-3z"/></svg>Files are processed in your browser. Nothing is uploaded or stored.</p>
+  </div>
+
+  <div class="step" id="s1">
+    <div class="step-h"><span class="dot">1</span><h2>Load</h2></div>
+    <label class="drop" id="drop" for="file">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 15v4a1 1 0 001 1h14a1 1 0 001-1v-4"/></svg>
+      <span><strong>Drop your shipment file here</strong><br><span class="muted small">CSV or JSONL export, plus the GeoJSON plot files it refers to</span></span>
+      <input id="file" type="file" multiple accept=".csv,.jsonl,.ndjson,.json,.geojson" hidden>
+    </label>
+    <div class="links">
+      <button class="link" id="sample">Try sample data</button>
+      <button class="link" id="template">Copy CSV template</button>
+    </div>
+    <div class="loaded" id="loaded"></div>
+    <div class="msg" id="loadMsg" role="status"></div>
+  </div>
+
+  <div class="step" id="s2">
+    <div class="step-h"><span class="dot">2</span><h2>Check</h2></div>
+    <p class="verdict" id="verdict">Load a file to see what can be filed.</p>
+    <div class="split" id="checkBar"></div>
+    <div class="legend" id="checkLegend"></div>
+    <ul class="problems" id="problems"></ul>
+    <details id="allWrap" hidden><summary id="allSummary">Show all problems</summary><ul class="problems" id="allProblems"></ul></details>
+    <details>
+      <summary>What we check</summary>
+      <ul class="rules">
+        <li><span>Every plot has geolocation, as GeoJSON points or polygons</span><small>Art. 9(1)(d)</small></li>
+        <li><span>Plots over 4 ha are polygons, not single points</span><small>Art. 2(28)</small></li>
+        <li><span>Polygons are closed and coordinates are valid longitude/latitude</span><small>Art. 2(28)</small></li>
+        <li><span>Goods description, HS heading and species are present</span><small>Art. 9(1)(a), Annex I</small></li>
+        <li><span>Quantity is given as net mass or supplementary unit</span><small>Art. 9(1)(b)</small></li>
+        <li><span>Countries of production and activity are ISO codes; imports name a border country</span><small>Art. 9(1)(c)</small></li>
+        <li><span>DEFORRO risk is negligible, or has been mitigated</span><small>Art. 10–11</small></li>
+        <li><span>Each shipment has its own internal reference</span><small>Annex II</small></li>
+      </ul>
+    </details>
+  </div>
+
+  <div class="step" id="s3">
+    <div class="step-h"><span class="dot">3</span><h2>File</h2></div>
+    <div class="file-row">
+      <button class="primary" id="fileBtn" disabled>File shipments</button>
+      <div class="outcome" id="outcome" role="status">Ready shipments are signed and sent to TRACES, which returns a reference and verification number for each.</div>
+    </div>
+    <div class="split" id="fileBar" hidden></div>
+  </div>
+
+  <div class="step" id="s4">
+    <div class="res-h">
+      <h2>Results</h2>
+      <div class="file-row" style="gap:14px">
+        <label class="toggle"><input type="checkbox" id="onlyProblems">Only problems</label>
+        <button class="ghost" id="copy">Copy results</button>
+      </div>
+    </div>
+    <div class="list">
+      <table>
+        <thead><tr><th>Shipment</th><th>Status</th><th>Reference no.</th><th>Verification</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div class="msg" id="copyMsg" role="status"></div>
+    <textarea id="csvBox" hidden readonly aria-label="Results as CSV"></textarea>
+  </div>
+
+  <footer>
+    <span>Sandbox → EU Acceptance → Production · <b>same rules, your TRACES credentials</b></span>
+    <span>Rules v0.1 · Regulation (EU) 2023/1115 · Oct 2026</span>
+  </footer>
+</div>
+
+<script>
+/*
+ * DEFORRO TRACES sandbox engine (browser + Node).
+ *
+ * A JavaScript port of the deforro_traces Python package: loaders, EUDR pre-flight
+ * validation, risk gate, SOAP/WS-Security envelope, a mock TRACES service and the
+ * bulk uploader. tests/test_web_parity.py runs both implementations over the same
+ * inputs and fails if their validation results, digests or SOAP bodies diverge.
+ */
+(function (root, factory) {
+  const api = factory();
+  if (typeof module === "object" && module.exports) module.exports = api;
+  else root.DeforroEngine = api;
+})(typeof self !== "undefined" ? self : this, function () {
+  "use strict";
+
+  // ------------------------------------------------------------------ constants
+
+  const ACTIVITY_TYPES = new Set(["IMPORT", "EXPORT", "DOMESTIC"]);
+  const KNOWN_OPERATOR_ROLES = new Set(["OPERATOR"]);
+  const GEOMETRY_TYPES = new Set(["Point", "MultiPoint", "Polygon", "MultiPolygon"]);
+  const ANNEX_I_HS_PREFIXES = [
+    "0102", "0201", "0202", "0206", "1602", "4101", "4104", "4107",
+    "1801", "1802", "1803", "1804", "1805", "1806",
+    "0901",
+    "1207", "1511", "1513", "2306", "2905", "2915", "3401", "3823",
+    "4001", "4005", "4006", "4007", "4008", "4010", "4011", "4012", "4013",
+    "4015", "4016", "4017",
+    "1201", "1208", "1507", "2304",
+    "44", "47", "48", "49", "9401", "9403", "9406",
+  ];
+  const COUNTRY_RE = /^[A-Z]{2}$/;
+  const HS_RE = /^\d{4}(\d{2}){0,2}$/;
+  const GROUPED_RE = /^[A-Z0-9]{8,20}$/;
+  const EARTH_RADIUS_M = 6371008.8;
+  const POINT_MAX_HECTARES = 4.0;
+  const MIN_DECIMALS = 6;
+  const MAX_GEOJSON_BYTES = 25 * 1024 * 1024;
+
+  const COMMODITY_BY_HS = [
+    ["1801", "Cocoa"], ["1802", "Cocoa"], ["1803", "Cocoa"], ["1804", "Cocoa"], ["1805", "Cocoa"], ["1806", "Cocoa"],
+    ["0901", "Coffee"],
+    ["1207", "Palm oil"], ["1511", "Palm oil"], ["1513", "Palm oil"], ["2306", "Palm oil"], ["2905", "Palm oil"],
+    ["2915", "Palm oil"], ["3401", "Palm oil"], ["3823", "Palm oil"],
+    ["4001", "Rubber"], ["40", "Rubber"],
+    ["1201", "Soya"], ["1208", "Soya"], ["1507", "Soya"], ["2304", "Soya"],
+    ["0102", "Cattle"], ["0201", "Cattle"], ["0202", "Cattle"], ["0206", "Cattle"], ["1602", "Cattle"], ["41", "Cattle"],
+    ["44", "Timber"], ["47", "Timber"], ["48", "Timber"], ["49", "Timber"], ["94", "Timber"],
+  ];
+
+  function commodityName(hs) {
+    for (const [prefix, name] of COMMODITY_BY_HS) if (String(hs || "").startsWith(prefix)) return name;
+    return "Other";
+  }
+
+  // ------------------------------------------------------------------ validation
+
+  class Result {
+    constructor() { this.issues = []; }
+    error(code, message, path = "") { this.issues.push({ level: "error", code, message, path }); }
+    warn(code, message, path = "") { this.issues.push({ level: "warning", code, message, path }); }
+    get errors() { return this.issues.filter((i) => i.level === "error"); }
+    get warnings() { return this.issues.filter((i) => i.level === "warning"); }
+    get ok() { return this.errors.length === 0; }
+  }
+
+  function validateStatement(stmt, config = {}) {
+    const requireGeo = config.requireGeolocation !== false;
+    const maxBytes = config.maxGeojsonBytes || MAX_GEOJSON_BYTES;
+    const r = new Result();
+    const ref = stmt.internal_reference;
+    if (!ref || ref.length > 50) r.error("REF", "internal reference is required (max 50 chars); it is the idempotency key");
+    if (!ACTIVITY_TYPES.has(stmt.activity_type))
+      r.error("ACTIVITY", `activityType must be IMPORT, EXPORT or DOMESTIC, got '${stmt.activity_type}'`);
+    if (!KNOWN_OPERATOR_ROLES.has(stmt.operator_role))
+      r.warn("ROLE", `operatorRole '${stmt.operator_role}' is not one the sandbox knows; check the XSD`);
+    for (const [label, value] of [["countryOfActivity", stmt.country_of_activity], ["borderCrossCountry", stmt.border_cross_country]]) {
+      if (value != null && !COUNTRY_RE.test(value))
+        r.error("COUNTRY", `${label} must be an ISO 3166-1 alpha-2 code, got '${value}'`);
+    }
+    if ((stmt.activity_type === "IMPORT" || stmt.activity_type === "EXPORT") && !stmt.border_cross_country)
+      r.error("BORDER", `borderCrossCountry is required for ${stmt.activity_type}`);
+    if (!stmt.commodities.length) r.error("COMMODITY", "at least one commodity is required");
+    for (const g of stmt.grouped_declarations)
+      if (!GROUPED_RE.test(g)) r.error("GROUPED", `grouped declaration '${g}' does not look like a DDS reference number`);
+
+    stmt.commodities.forEach((c, i) => {
+      const cp = `commodities[${i + 1}]`;
+      if (!c.description) r.error("DESCRIPTION", "descriptionOfGoods is required", cp);
+      if (!HS_RE.test(c.hs_heading || "")) r.error("HS", `hsHeading must be 4, 6 or 8 digits, got '${c.hs_heading}'`, cp);
+      else if (!ANNEX_I_HS_PREFIXES.some((p) => c.hs_heading.startsWith(p)))
+        r.warn("HS_ANNEX", `hsHeading ${c.hs_heading} is not a recognised Annex I heading`, cp);
+      if (c.net_weight == null && c.supplementary_unit == null) r.error("MEASURE", "netWeight or supplementaryUnit is required", cp);
+      if (c.net_weight != null && c.net_weight <= 0) r.error("MEASURE", `netWeight must be positive, got ${c.net_weight}`, cp);
+      if ((c.supplementary_unit == null) !== (c.supplementary_unit_qualifier == null))
+        r.error("MEASURE", "supplementaryUnit and supplementaryUnitQualifier go together", cp);
+      c.species.forEach((sp, si) => {
+        if (!sp.scientific_name) r.error("SPECIES", "scientificName is required", `${cp}.species[${si + 1}]`);
+      });
+      if (requireGeo && ACTIVITY_TYPES.has(stmt.activity_type) && !c.producers.length)
+        r.error("PRODUCER", "at least one producer with geolocation is required", cp);
+      c.producers.forEach((p, pi) => {
+        const pp = `${cp}.producers[${pi + 1}]`;
+        if (!COUNTRY_RE.test(p.country || "")) r.error("COUNTRY", `producer country must be ISO alpha-2, got '${p.country}'`, pp);
+        if (p.geojson == null) {
+          if (requireGeo) r.error("GEO_MISSING", "producer has no geometry", pp);
+          return;
+        }
+        const size = JSON.stringify(p.geojson).length;
+        if (size > maxBytes) r.error("GEO_SIZE", `GeoJSON is ${size} bytes, limit ${maxBytes}`, pp);
+        validateGeojson(p.geojson, r, pp);
+      });
+    });
+    return r;
+  }
+
+  function isObj(x) { return x !== null && typeof x === "object" && !Array.isArray(x); }
+
+  function validateGeojson(doc, r, path) {
+    if (!isObj(doc) || doc.type !== "FeatureCollection") { r.error("GEO_TYPE", "GeoJSON must be a FeatureCollection", path); return; }
+    const features = doc.features;
+    if (!Array.isArray(features) || !features.length) { r.error("GEO_EMPTY", "FeatureCollection has no features", path); return; }
+    let lowPrecision = false;
+    features.forEach((feature, fi) => {
+      const fp = `${path}.features[${fi + 1}]`;
+      if (!isObj(feature) || feature.type !== "Feature") { r.error("GEO_FEATURE", "each entry must be a Feature", fp); return; }
+      const geom = feature.geometry;
+      if (!isObj(geom) || !GEOMETRY_TYPES.has(geom.type)) {
+        r.error("GEO_GEOMETRY", "geometry type must be one of MultiPoint, MultiPolygon, Point, Polygon", fp);
+        return;
+      }
+      const props = isObj(feature.properties) ? feature.properties : {};
+      const coords = geom.coordinates;
+      let precise = false;
+      try {
+        if (geom.type === "Point") {
+          precise = checkPosition(coords, r, fp) || precise;
+          const area = props.Area;
+          if (typeof area === "number" && area > POINT_MAX_HECTARES)
+            r.error("GEO_POINT_AREA", `plot declares Area=${area} ha; plots over ${POINT_MAX_HECTARES} ha need a polygon`, fp);
+        } else if (geom.type === "MultiPoint") {
+          if (!Array.isArray(coords)) throw new TypeError("coords");
+          for (const pos of coords) precise = checkPosition(pos, r, fp) || precise;
+        } else if (geom.type === "Polygon") {
+          precise = checkPolygon(coords, r, fp) || precise;
+        } else {
+          if (!Array.isArray(coords)) throw new TypeError("coords");
+          for (const poly of coords) precise = checkPolygon(poly, r, fp) || precise;
+        }
+      } catch (e) {
+        r.error("GEO_COORDS", "malformed coordinates", fp);
+        return;
+      }
+      if (!precise) lowPrecision = true;
+    });
+    if (lowPrecision) r.warn("GEO_PRECISION", `a feature has no coordinate with ${MIN_DECIMALS}+ decimal places`, path);
+  }
+
+  function num(x) {
+    if (typeof x === "number") return x;
+    if (typeof x === "string" && x.trim() !== "" && !isNaN(Number(x))) return Number(x);
+    throw new TypeError("not a number");
+  }
+
+  function checkPosition(pos, r, path) {
+    if (!Array.isArray(pos) || pos.length < 2) throw new TypeError("position");
+    const lon = num(pos[0]), lat = num(pos[1]);
+    if (!(lon >= -180 && lon <= 180 && lat >= -90 && lat <= 90))
+      r.error("GEO_RANGE", `position [${pos[0]}, ${pos[1]}] out of range (expects [lon, lat])`, path);
+    return decimals(pos[0]) >= MIN_DECIMALS || decimals(pos[1]) >= MIN_DECIMALS;
+  }
+
+  function checkPolygon(rings, r, path) {
+    if (!Array.isArray(rings) || !rings.length) throw new TypeError("polygon");
+    let precise = false;
+    rings.forEach((ring, ri) => {
+      if (!Array.isArray(ring)) throw new TypeError("ring");
+      if (ring.length < 4) { r.error("GEO_RING", `ring ${ri} needs at least 4 positions`, path); return; }
+      const a = ring[0], b = ring[ring.length - 1];
+      if (!Array.isArray(a) || !Array.isArray(b)) throw new TypeError("ring");
+      if (a[0] !== b[0] || a[1] !== b[1]) r.error("GEO_RING", `ring ${ri} is not closed (first != last position)`, path);
+      for (const pos of ring) precise = checkPosition(pos, r, path) || precise;
+    });
+    if (rings[0].length >= 4 && ringAreaM2(rings[0]) === 0) r.error("GEO_RING", "outer ring has zero area", path);
+    return precise;
+  }
+
+  function decimals(value) {
+    const text = String(value);
+    if (/e/i.test(text)) return MIN_DECIMALS;
+    const dot = text.indexOf(".");
+    return dot === -1 ? 0 : text.length - dot - 1;
+  }
+
+  const rad = (d) => (d * Math.PI) / 180;
+
+  function ringAreaM2(ring) {
+    let total = 0;
+    for (let i = 0; i < ring.length - 1; i++) {
+      const [lon1, lat1] = ring[i].map(num), [lon2, lat2] = ring[i + 1].map(num);
+      total += rad(lon2 - lon1) * (2 + Math.sin(rad(lat1)) + Math.sin(rad(lat2)));
+    }
+    return (Math.abs(total) * EARTH_RADIUS_M ** 2) / 2;
+  }
+
+  function geojsonAreaHectares(doc) {
+    let total = 0;
+    for (const f of (doc && doc.features) || []) {
+      const g = (f && f.geometry) || {};
+      const polys = g.type === "Polygon" ? [g.coordinates] : g.type === "MultiPolygon" ? g.coordinates : [];
+      for (const rings of polys) {
+        try { total += ringAreaM2(rings[0]) - rings.slice(1).reduce((s, h) => s + ringAreaM2(h), 0); } catch (e) { /* invalid */ }
+      }
+    }
+    return total / 10000;
+  }
+
+  // ------------------------------------------------------------------ loaders
+
+  function req(obj, key) {
+    if (!isObj(obj) || !(key in obj)) throw new Error(`missing field '${key}'`);
+    return obj[key];
+  }
+
+  function dec(value) {
+    if (value == null || value === "") return null;
+    const n = Number(value);
+    if (Number.isNaN(n)) throw new Error(`'${value}' is not a number`);
+    return n;
+  }
+
+  // files: Map of path -> text for uploaded GeoJSON; resolved by exact relative path, then basename.
+  function resolveGeojson(ref, files) {
+    const clean = String(ref).replace(/^\.\//, "");
+    const base = clean.split(/[\\/]/).pop();
+    const text = files.get(clean) ?? files.get(base);
+    if (text == null) throw new Error(`GeoJSON file '${ref}' was not uploaded`);
+    try { return JSON.parse(text); } catch (e) { throw new Error(`GeoJSON file '${ref}' is not valid JSON`); }
+  }
+
+  function statementFromDict(data, files) {
+    const risk = data.risk;
+    return {
+      internal_reference: String(req(data, "internal_reference")),
+      activity_type: String(req(data, "activity_type")).toUpperCase(),
+      country_of_activity: data.country_of_activity ?? null,
+      border_cross_country: data.border_cross_country ?? null,
+      operator_role: data.operator_role ?? "OPERATOR",
+      geo_location_confidential: Boolean(data.geo_location_confidential),
+      grouped_declarations: [...(data.grouped_declarations || [])],
+      risk: risk
+        ? {
+            level: String(req(risk, "level")).toLowerCase(),
+            score: risk.score ?? null,
+            assessment_id: risk.assessment_id ?? null,
+            mitigated: Boolean(risk.mitigated),
+          }
+        : null,
+      commodities: req(data, "commodities").map((c) => ({
+        description: req(c, "description"),
+        hs_heading: String(req(c, "hs_heading")),
+        net_weight: dec(c.net_weight_kg),
+        supplementary_unit: dec(c.supplementary_unit),
+        supplementary_unit_qualifier: c.supplementary_unit_qualifier ?? null,
+        species: (c.species || []).map((s) => ({ scientific_name: req(s, "scientific_name"), common_name: s.common_name ?? null })),
+        producers: (c.producers || []).map((p) => {
+          let geojson = p.geojson ?? null;
+          if (p.geojson_file) geojson = resolveGeojson(p.geojson_file, files);
+          return { country: req(p, "country"), name: p.name ?? null, geojson };
+        }),
+      })),
+    };
+  }
+
+  function loadJsonl(text, files = new Map()) {
+    const out = [];
+    text.split(/\r?\n/).forEach((line, idx) => {
+      if (!line.trim() || line.trimStart().startsWith("#")) return;
+      let key = `line ${idx + 1}`;
+      try {
+        const data = JSON.parse(line);
+        key = (isObj(data) && data.internal_reference) || key;
+        out.push({ key: String(key), statement: statementFromDict(data, files), errors: [] });
+      } catch (e) {
+        out.push({ key: String(key), statement: null, errors: [e.message] });
+      }
+    });
+    return out;
+  }
+
+  function parseCsv(text) {
+    const rows = [];
+    let row = [], field = "", quoted = false;
+    text = text.replace(/^﻿/, "");
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (quoted) {
+        if (ch === '"' && text[i + 1] === '"') { field += '"'; i++; }
+        else if (ch === '"') quoted = false;
+        else field += ch;
+      } else if (ch === '"') quoted = true;
+      else if (ch === ",") { row.push(field); field = ""; }
+      else if (ch === "\n" || ch === "\r") {
+        if (ch === "\r" && text[i + 1] === "\n") i++;
+        row.push(field); rows.push(row); row = []; field = "";
+      } else field += ch;
+    }
+    if (field !== "" || row.length) { row.push(field); rows.push(row); }
+    return rows.filter((r) => r.some((v) => v.trim() !== ""));
+  }
+
+  function loadCsv(text, files = new Map()) {
+    const [header, ...body] = parseCsv(text);
+    if (!header) return [];
+    const cols = header.map((h) => h.trim());
+    const groups = new Map();
+    body.forEach((cells, i) => {
+      const row = {};
+      cols.forEach((c, j) => { if (c) row[c] = (cells[j] || "").trim(); });
+      const ref = row.internal_reference || `line ${i + 2}`;
+      if (!groups.has(ref)) groups.set(ref, []);
+      groups.get(ref).push({ line: i + 2, row });
+    });
+    const out = [];
+    for (const [ref, rows] of groups) {
+      try {
+        out.push({ key: ref, statement: statementFromRows(ref, rows.map((r) => r.row), files), errors: [] });
+      } catch (e) {
+        out.push({ key: ref, statement: null, errors: [`rows ${rows.map((r) => r.line).join(", ")}: ${e.message}`] });
+      }
+    }
+    return out;
+  }
+
+  function statementFromRows(ref, rows, files) {
+    const first = rows[0];
+    const commodities = new Map();
+    for (const row of rows) {
+      const ckey = `${req(row, "hs_heading")}\u0000${req(row, "description")}`;
+      if (!commodities.has(ckey))
+        commodities.set(ckey, {
+          description: row.description,
+          hs_heading: row.hs_heading,
+          net_weight_kg: row.net_weight_kg,
+          supplementary_unit: row.supplementary_unit,
+          supplementary_unit_qualifier: row.supplementary_unit_qualifier || null,
+          species: [],
+          producers: [],
+        });
+      const c = commodities.get(ckey);
+      if (row.scientific_name) {
+        const sp = { scientific_name: row.scientific_name, common_name: row.common_name || null };
+        if (!c.species.some((s) => s.scientific_name === sp.scientific_name && s.common_name === sp.common_name)) c.species.push(sp);
+      }
+      if (row.producer_country)
+        c.producers.push({ country: row.producer_country, name: row.producer_name || null, geojson_file: row.geojson_file || null });
+    }
+    const data = {
+      internal_reference: ref,
+      activity_type: req(first, "activity_type"),
+      country_of_activity: first.country_of_activity || null,
+      border_cross_country: first.border_cross_country || null,
+      commodities: [...commodities.values()],
+    };
+    if (first.risk_level) data.risk = { level: first.risk_level, score: first.risk_score ? Number(first.risk_score) : null };
+    return statementFromDict(data, files);
+  }
+
+  // ------------------------------------------------------------------ samples
+
+  function mulberry32(seed) {
+    let a = seed >>> 0;
+    const next = () => {
+      a = (a + 0x6d2b79f5) >>> 0;
+      let t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    return {
+      random: next,
+      uniform: (lo, hi) => lo + (hi - lo) * next(),
+      int: (lo, hi) => lo + Math.floor(next() * (hi - lo + 1)),
+      choice: (arr) => arr[Math.floor(next() * arr.length)],
+    };
+  }
+
+  const SAMPLE_COMMODITIES = [
+    ["1801", "Cocoa beans, whole, raw", "Theobroma cacao", "Cacao", ["GH", "CI", "CM"]],
+    ["0901", "Coffee, not roasted", "Coffea arabica", "Arabica coffee", ["ET", "CO", "BR"]],
+    ["1511", "Crude palm oil", "Elaeis guineensis", "Oil palm", ["ID", "MY"]],
+    ["4001", "Natural rubber, smoked sheets", "Hevea brasiliensis", "Rubber tree", ["TH", "CI"]],
+    ["4407", "Sawn wood, tropical", "Triplochiton scleroxylon", "Ayous", ["CM", "GH"]],
+  ];
+  const CENTROIDS = {
+    GH: [6.7, -1.6], CI: [6.9, -5.3], CM: [4.0, 11.5], ET: [7.7, 36.8], CO: [4.6, -75.7],
+    BR: [-12.5, -55.7], ID: [0.5, 101.4], MY: [3.8, 102.3], TH: [7.9, 98.4],
+  };
+  const EU_PORTS = ["BE", "NL", "DE", "FR", "IT", "ES"];
+  const COOP_WORDS = ["Asante", "Nyame", "Kpong", "Sankofa", "Bia", "Tano", "Abura", "Dorma", "Sefwi", "Juaso", "Yayu", "Sidama", "Huila", "Riau", "Jambi", "Surat"];
+
+  const round6 = (x) => Math.round(x * 1e6) / 1e6;
+
+  function samplePlot(rng, country, hectares) {
+    const [lat0, lon0] = CENTROIDS[country];
+    const lat = lat0 + rng.uniform(-1, 1), lon = lon0 + rng.uniform(-1, 1);
+    const props = { ProducerCountry: country, Area: Math.round(hectares * 1e4) / 1e4 };
+    let geometry;
+    if (hectares <= 4 && rng.random() < 0.3) {
+      geometry = { type: "Point", coordinates: [round6(lon), round6(lat)] };
+    } else {
+      const radius = Math.sqrt((hectares * 10000) / (1.5 * Math.sqrt(3)));
+      const ring = [];
+      for (let k = 0; k < 6; k++) {
+        const angle = rad(60 * k + rng.uniform(-10, 10));
+        const r = radius * rng.uniform(0.85, 1.15);
+        ring.push([round6(lon + (r * Math.cos(angle)) / (111320 * Math.cos(rad(lat)))), round6(lat + (r * Math.sin(angle)) / 111320)]);
+      }
+      ring.push([...ring[0]]);
+      geometry = { type: "Polygon", coordinates: [ring] };
+    }
+    return { type: "FeatureCollection", features: [{ type: "Feature", properties: props, geometry }] };
+  }
+
+  function generateSamples(count, { seed = 7, prefix = "DEF", riskyRate = 0.06, invalidRate = 0.08 } = {}) {
+    const rng = mulberry32(seed);
+    const records = [];
+    for (let n = 1; n <= count; n++) {
+      const [hs, desc, sci, common, countries] = rng.choice(SAMPLE_COMMODITIES);
+      const origin = rng.choice(countries);
+      const port = rng.choice(EU_PORTS);
+      const producers = [];
+      const nProducers = rng.int(1, 4);
+      for (let p = 0; p < nProducers; p++)
+        producers.push({
+          country: origin,
+          name: `${rng.choice(COOP_WORDS)} ${rng.choice(["Farmers", "Growers", "Cooperative", "Union", "Estate"])}`,
+          geojson: samplePlot(rng, origin, rng.choice([0.8, 1.5, 3.2, 6.0, 12.5, 40.0])),
+        });
+      const level = rng.random() < riskyRate ? rng.choice(["standard", "high"]) : "negligible";
+      const record = {
+        internal_reference: `${prefix}-${String(n).padStart(6, "0")}`,
+        activity_type: "IMPORT",
+        country_of_activity: port,
+        border_cross_country: port,
+        risk: {
+          level,
+          score: Math.round((level === "negligible" ? rng.uniform(0, 0.1) : rng.uniform(0.4, 0.95)) * 1000) / 1000,
+          assessment_id: `RA-${String(n).padStart(6, "0")}`,
+        },
+        commodities: [{
+          description: desc, hs_heading: hs,
+          net_weight_kg: rng.choice([500, 1200, 5000, 12000, 24000]),
+          species: [{ scientific_name: sci, common_name: common }],
+          producers,
+        }],
+      };
+      if (rng.random() < invalidRate) {
+        const breakage = rng.choice(["open_ring", "latlon_swap", "no_border", "point_too_big"]);
+        const feature = producers[0].geojson.features[0];
+        const geom = feature.geometry;
+        if (breakage === "open_ring" && geom.type === "Polygon") geom.coordinates[0].pop();
+        else if (breakage === "latlon_swap") geom.coordinates = swap(geom.coordinates);
+        else if (breakage === "point_too_big") {
+          feature.geometry = { type: "Point", coordinates: geom.type === "Point" ? geom.coordinates : geom.coordinates[0][0] };
+          feature.properties.Area = 12.5;
+        } else delete record.border_cross_country;
+      }
+      records.push(record);
+    }
+    return records;
+  }
+
+  function swap(c) {
+    return typeof c[0] === "number" ? [c[1], c[0] + 200] : c.map(swap);
+  }
+
+  // ------------------------------------------------------------------ crypto + encoding
+
+  const subtle = () => (globalThis.crypto && globalThis.crypto.subtle) || require("crypto").webcrypto.subtle;
+
+  function bytesToB64(bytes) {
+    let bin = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(bin);
+  }
+  function b64ToBytes(b64) {
+    const bin = atob(b64);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  const utf8 = (s) => new TextEncoder().encode(s);
+
+  async function sha1B64(bytes) {
+    return bytesToB64(new Uint8Array(await subtle().digest("SHA-1", bytes)));
+  }
+  async function sha256Hex(text) {
+    const buf = new Uint8Array(await subtle().digest("SHA-256", utf8(text)));
+    return [...buf].map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+
+  function concat(...arrays) {
+    const out = new Uint8Array(arrays.reduce((n, a) => n + a.length, 0));
+    let o = 0;
+    for (const a of arrays) { out.set(a, o); o += a.length; }
+    return out;
+  }
+
+  function formatTimestamp(date) {
+    return date.toISOString(); // 2026-05-20T09:55:01.123Z, same shape as the Python client
+  }
+
+  async function passwordDigest(nonceBytes, created, password) {
+    return sha1B64(concat(nonceBytes, utf8(created), utf8(password)));
+  }
+
+  async function makeToken(creds, { ttlSeconds = 60, now = new Date(), nonce = null } = {}) {
+    nonce = nonce || globalThis.crypto.getRandomValues(new Uint8Array(16));
+    const created = formatTimestamp(now);
+    const expires = formatTimestamp(new Date(now.getTime() + ttlSeconds * 1000));
+    return {
+      username: creds.username,
+      passwordDigest: await passwordDigest(nonce, created, creds.authKey),
+      nonceB64: bytesToB64(nonce),
+      created,
+      expires,
+    };
+  }
+
+  // ------------------------------------------------------------------ SOAP
+
+  const NS = {
+    soapenv: "http://schemas.xmlsoap.org/soap/envelope/",
+    v4: "http://ec.europa.eu/sanco/tracesnt/base/v4",
+    dds: "http://ec.europa.eu/tracesnt/certificate/eudr/due-diligence-statement/v3",
+    eudrCommon: "http://ec.europa.eu/tracesnt/certificate/eudr/common/v3",
+    wsse: "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd",
+    wsu: "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd",
+  };
+  const PASSWORD_DIGEST_TYPE = "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-username-token-profile-1.0#PasswordDigest";
+  const NONCE_ENCODING = "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-soap-message-security-1.0#Base64Binary";
+
+  const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const el = (tag, text, indent) => `${indent}<${tag}>${esc(text)}</${tag}>`;
+
+  function formatNumber(n) {
+    // Plain decimal, no exponent, no trailing zeros (mirrors models.format_decimal).
+    if (Number.isInteger(n)) return String(n);
+    return n.toFixed(6).replace(/0+$/, "").replace(/\.$/, "");
+  }
+
+  function encodeGeojson(doc) {
+    return bytesToB64(utf8(JSON.stringify(doc)));
+  }
+
+  function statementXml(stmt, i0 = "        ", { truncateGeo = false } = {}) {
+    const i1 = i0 + "    ", i2 = i1 + "    ", i3 = i2 + "    ", i4 = i3 + "    ";
+    const L = [`${i0}<dds:statement>`];
+    L.push(el("dds:internalReferenceNumber", stmt.internal_reference, i1));
+    L.push(el("dds:activityType", stmt.activity_type, i1));
+    if (stmt.country_of_activity) L.push(el("dds:countryOfActivity", stmt.country_of_activity, i1));
+    if (stmt.border_cross_country) L.push(el("dds:borderCrossCountry", stmt.border_cross_country, i1));
+    stmt.commodities.forEach((c, ci) => {
+      L.push(`${i1}<dds:commodities>`);
+      L.push(el("dds:position", ci + 1, i2));
+      L.push(`${i2}<dds:descriptors>`);
+      L.push(el("eudrCommon:descriptionOfGoods", c.description, i3));
+      L.push(`${i3}<eudrCommon:goodsMeasure>`);
+      if (c.net_weight != null) L.push(el("eudrCommon:netWeight", formatNumber(c.net_weight), i4));
+      if (c.supplementary_unit != null) L.push(el("eudrCommon:supplementaryUnit", formatNumber(c.supplementary_unit), i4));
+      if (c.supplementary_unit_qualifier) L.push(el("eudrCommon:supplementaryUnitQualifier", c.supplementary_unit_qualifier, i4));
+      L.push(`${i3}</eudrCommon:goodsMeasure>`);
+      L.push(`${i2}</dds:descriptors>`);
+      L.push(el("dds:hsHeading", c.hs_heading, i2));
+      for (const sp of c.species) {
+        L.push(`${i2}<dds:speciesInfo>`);
+        L.push(el("dds:scientificName", sp.scientific_name, i3));
+        if (sp.common_name) L.push(el("dds:commonName", sp.common_name, i3));
+        L.push(`${i2}</dds:speciesInfo>`);
+      }
+      c.producers.forEach((p, pi) => {
+        L.push(`${i2}<dds:producers>`);
+        L.push(el("dds:position", pi + 1, i3));
+        L.push(el("dds:country", p.country, i3));
+        if (p.name) L.push(el("dds:name", p.name, i3));
+        if (p.geojson != null) {
+          let geo = encodeGeojson(p.geojson);
+          if (truncateGeo && geo.length > 64) geo = `${geo.slice(0, 48)}…(${geo.length} chars)`;
+          L.push(el("dds:geometryGeojson", geo, i3));
+        }
+        L.push(`${i2}</dds:producers>`);
+      });
+      L.push(`${i1}</dds:commodities>`);
+    });
+    L.push(el("dds:geoLocationConfidential", stmt.geo_location_confidential ? "true" : "false", i1));
+    for (const g of stmt.grouped_declarations) {
+      L.push(`${i1}<dds:groupedDeclarations>`);
+      L.push(el("eudrCommon:groupedDeclaration", g, i2));
+      L.push(`${i1}</dds:groupedDeclarations>`);
+    }
+    L.push(`${i0}</dds:statement>`);
+    return L.join("\n");
+  }
+
+  function submitBody(stmt, opts) {
+    return [
+      "        <dds:SubmitDdsRequest>",
+      el("dds:operatorRole", stmt.operator_role, "            "),
+      statementXml(stmt, "            ", opts),
+      "        </dds:SubmitDdsRequest>",
+    ].join("\n");
+  }
+
+  function envelope(token, clientId, body, { redact = false } = {}) {
+    const pw = redact ? "***" : esc(token.passwordDigest);
+    const nonce = redact ? "***" : esc(token.nonceB64);
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<soapenv:Envelope xmlns:soapenv="${NS.soapenv}" xmlns:v4="${NS.v4}" xmlns:dds="${NS.dds}" xmlns:eudrCommon="${NS.eudrCommon}">
+    <soapenv:Header>
+        <wsse:Security xmlns:wsse="${NS.wsse}" xmlns:wsu="${NS.wsu}">
+            <wsu:Timestamp wsu:Id="TS-1">
+                <wsu:Created>${token.created}</wsu:Created>
+                <wsu:Expires>${token.expires}</wsu:Expires>
+            </wsu:Timestamp>
+            <wsse:UsernameToken wsu:Id="UT-1">
+                <wsse:Username>${esc(token.username)}</wsse:Username>
+                <wsse:Password Type="${PASSWORD_DIGEST_TYPE}">${pw}</wsse:Password>
+                <wsse:Nonce EncodingType="${NONCE_ENCODING}">${nonce}</wsse:Nonce>
+                <wsu:Created>${token.created}</wsu:Created>
+            </wsse:UsernameToken>
+        </wsse:Security>
+        <v4:WebServiceClientId>${esc(clientId)}</v4:WebServiceClientId>
+    </soapenv:Header>
+    <soapenv:Body>
+${body}
+    </soapenv:Body>
+</soapenv:Envelope>`;
+  }
+
+  function getDdsBody(uuids) {
+    return ["        <dds:GetDdsRequest>", ...uuids.map((u) => el("dds:uuidList", u, "            ")), "        </dds:GetDdsRequest>"].join("\n");
+  }
+
+  // Minimal namespace-agnostic XML reading (DOMParser in browsers).
+  function parseXml(text) {
+    const doc = new DOMParser().parseFromString(text, "application/xml");
+    if (doc.getElementsByTagName("parsererror").length) throw new Error("not well-formed XML");
+    return doc;
+  }
+  const kids = (node, name) => (node ? [...node.children].filter((c) => c.localName === name) : []);
+  const kid = (node, name) => kids(node, name)[0] || null;
+  const txt = (node, name) => { const k = kid(node, name); return k ? k.textContent.trim() : null; };
+  const firstByLocal = (doc, name) => doc.getElementsByTagNameNS("*", name)[0] || null;
+
+  function statementFromXml(st) {
+    return {
+      internal_reference: txt(st, "internalReferenceNumber") || "",
+      activity_type: txt(st, "activityType") || "",
+      country_of_activity: txt(st, "countryOfActivity"),
+      border_cross_country: txt(st, "borderCrossCountry"),
+      operator_role: "OPERATOR",
+      geo_location_confidential: txt(st, "geoLocationConfidential") === "true",
+      grouped_declarations: kids(st, "groupedDeclarations").map((g) => txt(g, "groupedDeclaration")).filter(Boolean),
+      risk: null,
+      commodities: kids(st, "commodities").map((com) => {
+        const desc = kid(com, "descriptors"), gm = kid(desc, "goodsMeasure");
+        const nw = txt(gm, "netWeight"), su = txt(gm, "supplementaryUnit");
+        return {
+          description: txt(desc, "descriptionOfGoods") || "",
+          hs_heading: txt(com, "hsHeading") || "",
+          net_weight: nw ? Number(nw) : null,
+          supplementary_unit: su ? Number(su) : null,
+          supplementary_unit_qualifier: txt(gm, "supplementaryUnitQualifier"),
+          species: kids(com, "speciesInfo").map((s) => ({ scientific_name: txt(s, "scientificName") || "", common_name: txt(s, "commonName") })),
+          producers: kids(com, "producers").map((p) => {
+            const raw = txt(p, "geometryGeojson");
+            let geojson = null;
+            if (raw) {
+              try { geojson = JSON.parse(new TextDecoder().decode(b64ToBytes(raw))); } catch (e) { geojson = { __invalid__: true }; }
+            }
+            return { country: txt(p, "country") || "", name: txt(p, "name"), geojson };
+          }),
+        };
+      }),
+    };
+  }
+
+  // ------------------------------------------------------------------ mock TRACES
+
+  const SANDBOX_CREDS = { username: "sandbox", authKey: "sandbox-auth-key", clientId: "eudr-test" };
+  const ALNUM = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+
+  class MockTraces {
+    constructor({ processingDelayMs = 1500, rejectRate = 0, faultRate = 0, seed = 11 } = {}) {
+      Object.assign(this, { processingDelayMs, rejectRate, faultRate });
+      this.rng = mulberry32(seed);
+      this.store = new Map();
+      this.nonces = new Set();
+      this.requests = 0;
+      this.faultsInjected = 0;
+    }
+    code(n) { let s = ""; for (let i = 0; i < n; i++) s += this.rng.choice(ALNUM); return s; }
+    refresh(d) { if (d.status === "SUBMITTED" && Date.now() - d.submittedAt >= this.processingDelayMs) d.status = d.finalStatus; }
+
+    async handle(xml) {
+      this.requests++;
+      if (this.rng.random() < this.faultRate) { this.faultsInjected++; return { status: 503, body: "Service Unavailable (injected by sandbox)" }; }
+      let doc;
+      try { doc = parseXml(xml); } catch (e) { return fault("soapenv:Client", "Malformed XML"); }
+      const auth = await this.authenticate(doc);
+      if (auth) return auth;
+      const body = firstByLocal(doc, "Body");
+      const request = body && body.firstElementChild;
+      if (!request) return fault("soapenv:Client", "Missing SOAP Body");
+      switch (request.localName) {
+        case "SubmitDdsRequest": return this.submit(request);
+        case "GetDdsRequest": return this.get(request);
+        case "WithdrawDdsRequest": return this.withdraw(request);
+        default: return fault("soapenv:Client", `Unknown operation ${request.localName}`);
+      }
+    }
+
+    async authenticate(doc) {
+      const token = firstByLocal(doc, "UsernameToken");
+      if (!token) return fault("wsse:InvalidSecurity", "Missing WS-Security UsernameToken");
+      if (txt(firstByLocal(doc, "Header"), "WebServiceClientId") !== SANDBOX_CREDS.clientId)
+        return fault("soapenv:Client", "Invalid or missing WebServiceClientId");
+      const created = txt(token, "Created"), nonce = txt(token, "Nonce");
+      let expected;
+      try { expected = await passwordDigest(b64ToBytes(nonce), created, SANDBOX_CREDS.authKey); } catch (e) {
+        return fault("wsse:InvalidSecurity", "Malformed Nonce or Created");
+      }
+      if (txt(token, "Username") !== SANDBOX_CREDS.username || txt(token, "Password") !== expected)
+        return fault("wsse:FailedAuthentication", "The security token could not be authenticated");
+      if (Math.abs(Date.now() - Date.parse(created)) > 300000) return fault("wsse:MessageExpired", "The message has expired");
+      if (this.nonces.has(nonce)) return fault("wsse:InvalidSecurity", "Nonce has already been used");
+      this.nonces.add(nonce);
+      return null;
+    }
+
+    submit(request) {
+      const stmt = statementFromXml(kid(request, "statement"));
+      stmt.operator_role = txt(request, "operatorRole") || "OPERATOR";
+      const result = validateStatement(stmt);
+      if (!result.ok) return businessFault(result.errors.map((i) => [`EUDR-${i.code}`, `${i.path} ${i.message}`.trim()]));
+      const country = stmt.country_of_activity || "BE";
+      const uuid = globalThis.crypto.randomUUID();
+      this.store.set(uuid, {
+        uuid, stmt, submittedAt: Date.now(), status: "SUBMITTED", version: 1,
+        finalStatus: this.rng.random() < this.rejectRate ? "REJECTED" : "AVAILABLE",
+        reference: String(new Date().getUTCFullYear()).slice(2) + country + this.code(10),
+        verification: this.code(8),
+      });
+      return ok(`<dds:SubmitDdsResponse xmlns:dds="${NS.dds}"><dds:uuid>${uuid}</dds:uuid></dds:SubmitDdsResponse>`);
+    }
+
+    get(request) {
+      const items = kids(request, "uuidList").map((u) => this.store.get(u.textContent.trim())).filter(Boolean);
+      const lists = items.map((d) => {
+        this.refresh(d);
+        const final = d.status !== "SUBMITTED" && d.status !== "REJECTED";
+        return `<dds:ddsOverviewList><c:uuid>${d.uuid}</c:uuid><c:internalReferenceNumber>${esc(d.stmt.internal_reference)}</c:internalReferenceNumber>` +
+          (final ? `<c:referenceNumber>${d.reference}</c:referenceNumber><c:verificationNumber>${d.verification}</c:verificationNumber>` : "") +
+          `<c:status>${d.status}</c:status><c:date>${new Date(d.submittedAt).toISOString()}</c:date><c:updatedBy>sandbox</c:updatedBy><c:version>${d.version}</c:version></dds:ddsOverviewList>`;
+      });
+      return ok(`<dds:GetDdsResponse xmlns:dds="${NS.dds}" xmlns:c="${NS.eudrCommon}">${lists.join("")}</dds:GetDdsResponse>`);
+    }
+
+    withdraw(request) {
+      const d = this.store.get(txt(request, "uuid"));
+      if (!d) return businessFault([["EUDR-NOT-FOUND", "No statement with this UUID"]]);
+      this.refresh(d);
+      if (["WITHDRAWN", "REJECTED", "GROUPED"].includes(d.status))
+        return businessFault([["EUDR-STATUS", `Statement in status ${d.status} cannot be withdrawn`]]);
+      d.status = "WITHDRAWN";
+      return ok(`<dds:WithdrawDdsResponse xmlns:dds="${NS.dds}"><dds:uuid>${d.uuid}</dds:uuid><dds:status>WITHDRAWN</dds:status></dds:WithdrawDdsResponse>`);
+    }
+  }
+
+  function wrap(inner) {
+    return `<?xml version="1.0" encoding="UTF-8"?><S:Envelope xmlns:S="${NS.soapenv}"><S:Body>${inner}</S:Body></S:Envelope>`;
+  }
+  const ok = (inner) => ({ status: 200, body: wrap(inner) });
+  function fault(code, message, detail = "") {
+    return { status: 500, body: wrap(`<S:Fault><faultcode>${code}</faultcode><faultstring>${esc(message)}</faultstring>${detail ? `<detail>${detail}</detail>` : ""}</S:Fault>`) };
+  }
+  function businessFault(errors) {
+    const items = errors.map(([c, m]) => `<d:error><d:code>${esc(c)}</d:code><d:message>${esc(m)}</d:message></d:error>`).join("");
+    return fault("soapenv:Client", "Business rules validation failed", `<d:BusinessRulesValidationException xmlns:d="${NS.dds}">${items}</d:BusinessRulesValidationException>`);
+  }
+
+  class SoapFault extends Error {
+    constructor(code, message, details) {
+      super(`${code}: ${message}${details.length ? ` (${details.join("; ")})` : ""}`);
+      Object.assign(this, { code, faultMessage: message, details });
+    }
+  }
+  class TransportError extends Error {}
+
+  function parseResponse({ status, body }) {
+    if (!body.startsWith("<?xml") && !body.startsWith("<")) {
+      throw Object.assign(new TransportError(`HTTP ${status}`), { retryable: [408, 429, 500, 502, 503, 504].includes(status) });
+    }
+    const doc = parseXml(body);
+    const b = firstByLocal(doc, "Body");
+    const first = b && b.firstElementChild;
+    if (first && first.localName === "Fault") {
+      const detail = kid(first, "detail");
+      const details = detail ? [...detail.getElementsByTagNameNS("*", "message")].map((m) => m.textContent.trim()) : [];
+      throw new SoapFault(txt(first, "faultcode") || "Server", txt(first, "faultstring") || "", details);
+    }
+    return first;
+  }
+
+  // ------------------------------------------------------------------ uploader
+
+  // Ledger states, as in deforro_traces/ledger.py
+  const S = {
+    INVALID: "INVALID", BLOCKED_RISK: "BLOCKED_RISK", READY: "READY", SUBMITTING: "SUBMITTING",
+    SUBMITTED: "SUBMITTED", DONE: "DONE", REJECTED: "REJECTED", WITHDRAWN: "WITHDRAWN",
+  };
+
+  function riskGate(stmt, allowed = new Set(["negligible"]), allowMissing = false) {
+    const risk = stmt.risk;
+    if (!risk) return allowMissing ? null : "no DEFORRO risk assessment attached";
+    if (allowed.has(risk.level) || risk.mitigated) return null;
+    return `risk level '${risk.level}' is not cleared for submission (score ${risk.score ?? "n/a"})`;
+  }
+
+  function payloadKey(stmt) {
+    const { risk, ...rest } = stmt;
+    return JSON.stringify(rest);
+  }
+
+  class Sandbox {
+    constructor({ mock } = {}) {
+      this.mock = mock || new MockTraces();
+      this.ledger = new Map(); // internal reference -> row
+      this.stats = { requests: 0, retries: 0 };
+    }
+
+    log(row, event, detail = "") { row.events.push({ at: new Date(), event, detail }); }
+
+    // Pre-flight: load records into the ledger with INVALID / BLOCKED_RISK / READY.
+    preflight(records) {
+      const seen = new Set();
+      for (const rec of records) {
+        let row = this.ledger.get(rec.key);
+        const fresh = !row;
+        if (fresh) {
+          row = { ref: rec.key, events: [], attempts: 0 };
+          this.ledger.set(rec.key, row);
+        }
+        const live = row.uuid && (row.state === S.SUBMITTED || row.state === S.DONE);
+        row.statement = rec.statement;
+        if (!rec.statement) {
+          Object.assign(row, { issues: rec.errors.map((m) => ({ level: "error", code: "LOAD", message: m, path: "" })) });
+          if (!live) row.state = S.INVALID;
+          this.log(row, "load error", rec.errors.join("; "));
+          continue;
+        }
+        if (seen.has(rec.key)) {
+          row.issues = [{ level: "error", code: "DUPLICATE", message: "internal reference appears more than once in the file", path: "" }];
+          if (!live) row.state = S.INVALID;
+          continue;
+        }
+        seen.add(rec.key);
+        const result = validateStatement(rec.statement);
+        row.issues = result.issues;
+        const key = payloadKey(rec.statement);
+        if (live) {
+          row.changed = key !== row.payloadKey;
+          this.log(row, row.changed ? "content changed since filing" : "unchanged since filing");
+          continue;
+        }
+        row.payloadKey = key;
+        if (!result.ok) { row.state = S.INVALID; this.log(row, "pre-flight failed", `${result.errors.length} error(s)`); continue; }
+        const gate = riskGate(rec.statement);
+        if (gate) { row.state = S.BLOCKED_RISK; row.gate = gate; this.log(row, "held by risk gate", gate); continue; }
+        if (row.state === S.REJECTED && row.rejectedKey === key) { this.log(row, "rejected earlier, unchanged"); continue; }
+        row.state = S.READY;
+        this.log(row, "ready to file");
+      }
+    }
+
+    async call(body) {
+      let lastError;
+      for (let attempt = 1; attempt <= 6; attempt++) {
+        const token = await makeToken(SANDBOX_CREDS);
+        const xml = envelope(token, SANDBOX_CREDS.clientId, body);
+        this.stats.requests++;
+        try {
+          return parseResponse(await this.mock.handle(xml));
+        } catch (e) {
+          if (!(e instanceof TransportError) || !e.retryable) throw e;
+          lastError = e;
+          this.stats.retries++;
+          await new Promise((r) => setTimeout(r, Math.min(200, 10 * 2 ** attempt * Math.random())));
+        }
+      }
+      throw lastError;
+    }
+
+    async submitOne(row) {
+      row.state = S.SUBMITTING;
+      row.attempts++;
+      this.log(row, "signed and sent", "submitDds");
+      try {
+        const resp = await this.call(submitBody(row.statement));
+        row.uuid = txt(resp, "uuid");
+        row.state = S.SUBMITTED;
+        row.traces = "SUBMITTED";
+        this.log(row, "TRACES accepted", `uuid ${row.uuid}`);
+        return "submitted";
+      } catch (e) {
+        if (e instanceof SoapFault) {
+          Object.assign(row, { state: S.REJECTED, error: e.message, rejectedKey: row.payloadKey });
+          this.log(row, "TRACES refused", e.message);
+          return "rejected";
+        }
+        row.state = S.READY;
+        row.error = e.message;
+        this.log(row, "transport failed after retries", e.message);
+        return "failed";
+      }
+    }
+
+    async poll() {
+      const pending = [...this.ledger.values()].filter((r) => r.state === S.SUBMITTED);
+      for (let i = 0; i < pending.length; i += 50) {
+        const chunk = pending.slice(i, i + 50);
+        let resp;
+        try { resp = await this.call(getDdsBody(chunk.map((r) => r.uuid))); } catch (e) { continue; }
+        const byUuid = new Map(chunk.map((r) => [r.uuid, r]));
+        for (const ov of kids(resp, "ddsOverviewList")) {
+          const row = byUuid.get(txt(ov, "uuid"));
+          if (!row) continue;
+          const status = txt(ov, "status");
+          if (status === row.traces) continue;
+          row.traces = status;
+          row.reference = txt(ov, "referenceNumber");
+          row.verification = txt(ov, "verificationNumber");
+          row.version = txt(ov, "version");
+          if (status === "AVAILABLE" && row.reference) { row.state = S.DONE; this.log(row, "official numbers issued", `${row.reference} / ${row.verification}`); }
+          else if (status === "REJECTED") {
+            Object.assign(row, { state: S.REJECTED, error: "TRACES status REJECTED", rejectedKey: row.payloadKey });
+            this.log(row, "rejected by TRACES after processing");
+          }
+        }
+      }
+      return [...this.ledger.values()].filter((r) => r.state === S.SUBMITTED).length;
+    }
+
+    async withdraw(ref) {
+      const row = this.ledger.get(ref);
+      const resp = await this.call(`        <dds:WithdrawDdsRequest>\n${el("dds:uuid", row.uuid, "            ")}\n        </dds:WithdrawDdsRequest>`);
+      row.state = S.WITHDRAWN;
+      row.traces = txt(resp, "status");
+      this.log(row, "withdrawn");
+    }
+
+    async previewEnvelope(ref) {
+      const row = this.ledger.get(ref);
+      const token = await makeToken(SANDBOX_CREDS);
+      return envelope(token, "YOUR_CLIENT_ID", submitBody(row.statement, { truncateGeo: true }), { redact: true });
+    }
+
+    counts() {
+      const c = {};
+      for (const r of this.ledger.values()) c[r.state] = (c[r.state] || 0) + 1;
+      return c;
+    }
+  }
+
+  return {
+    S, validateStatement, geojsonAreaHectares, loadJsonl, loadCsv, parseCsv, generateSamples, commodityName,
+    makeToken, passwordDigest, envelope, submitBody, statementXml, encodeGeojson, sha256Hex, bytesToB64,
+    MockTraces, Sandbox, riskGate, SANDBOX_CREDS, SoapFault, TransportError,
+  };
+});
+
+</script>
+<script>window.DEFORRO_SITE = true;</script>
+<script>
+(() => {
+  "use strict";
+  const E = window.DeforroEngine;
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const fmt = new Intl.NumberFormat("en-GB");
+  const MAX_BYTES = 25 * 1024 * 1024;
+  const RENDER_LIMIT = 400;
+
+  const PROBLEMS = {
+    GEO_RING: "Plot boundary not closed", GEO_RANGE: "Coordinates out of range (latitude/longitude swapped?)",
+    GEO_POINT_AREA: "Plot over 4 ha given as a point", GEO_MISSING: "Producer without geolocation",
+    GEO_TYPE: "Geolocation is not GeoJSON", GEO_EMPTY: "GeoJSON without plots", GEO_GEOMETRY: "Unsupported plot geometry",
+    GEO_COORDS: "Malformed coordinates", GEO_SIZE: "GeoJSON too large", BORDER: "Border-crossing country missing",
+    COUNTRY: "Country is not an ISO code", HS: "HS heading malformed", MEASURE: "Quantity missing or invalid",
+    PRODUCER: "No producers listed", SPECIES: "Species name missing", ACTIVITY: "Unknown activity type",
+    REF: "Internal reference missing", GROUPED: "Grouped declaration malformed", DESCRIPTION: "Description of goods missing",
+    LOAD: "Row could not be read", DUPLICATE: "Internal reference used twice", RISK: "Risk not negligible: mitigate first",
+  };
+  const STATUS = {
+    READY: ["Ready", "--mint"], INVALID: ["Fix data", "--amber"], BLOCKED_RISK: ["Risk-held", "--coral"],
+    SUBMITTING: ["Sending", "--sky"], SUBMITTED: ["Awaiting TRACES", "--sky"], DONE: ["Filed", "--mint"],
+    REJECTED: ["Rejected", "--coral"], WITHDRAWN: ["Withdrawn", "--muted"],
+  };
+  const TEMPLATE = [
+    "internal_reference,activity_type,country_of_activity,border_cross_country,description,hs_heading,net_weight_kg,scientific_name,common_name,producer_country,producer_name,geojson_file,risk_level,risk_score",
+    'SHIP-0001,IMPORT,BE,BE,"Cocoa beans, whole, raw",1801,5000,Theobroma cacao,Cacao,GH,Kofi Cooperative,plots/kofi.geojson,negligible,0.02',
+  ].join("\n");
+
+  let sandbox = null, open = null, filing = false, pollTimer = null;
+  // Hosted builds can download files; the embedded preview build cannot, so it copies to the clipboard instead.
+  const SITE = window.DEFORRO_SITE === true;
+  if (SITE) { $("template").textContent = "Download CSV template"; $("copy").textContent = "Download results"; }
+
+  function download(name, text, msgEl, done) {
+    const url = URL.createObjectURL(new Blob([text], { type: "text/csv;charset=utf-8" }));
+    const a = Object.assign(document.createElement("a"), { href: url, download: name });
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    msgEl.textContent = done; msgEl.style.color = "var(--mint)";
+  }
+
+  // ------------------------------------------------------------ load
+
+  function start(records, label) {
+    if (pollTimer) clearTimeout(pollTimer);
+    // Failures still happen quietly (retried server errors, the odd rejection), as in real life.
+    sandbox = new E.Sandbox({ mock: new E.MockTraces({ faultRate: 0.05, rejectRate: 0.02, processingDelayMs: 1500 }) });
+    sandbox.preflight(records);
+    open = null;
+    $("loaded").textContent = label;
+    $("csvBox").hidden = true;
+    $("copyMsg").textContent = "";
+    render();
+  }
+
+  function loadSample() {
+    $("loadMsg").textContent = "";
+    const recs = E.generateSamples(500, { seed: (Date.now() % 100000) | 0 })
+      .map((d) => E.loadJsonl(JSON.stringify(d))[0]);
+    start(recs, "Sample data · 500 synthetic shipments");
+  }
+
+  async function loadFiles(list) {
+    const files = [...list];
+    $("loadMsg").textContent = "";
+    if (!files.length) return;
+    const size = files.reduce((s, f) => s + f.size, 0);
+    if (size > MAX_BYTES) return void ($("loadMsg").textContent = `These files are ${(size / 1048576).toFixed(1)} MB. The sandbox takes up to 25 MB; split the export and try again.`);
+    const main = files.filter((f) => /\.(csv|jsonl|ndjson)$/i.test(f.name));
+    if (main.length !== 1)
+      return void ($("loadMsg").textContent = main.length
+        ? "Add one shipment file at a time, plus its GeoJSON plot files."
+        : "No shipment file found. Add a .csv or .jsonl export; GeoJSON files only hold plots.");
+    const plots = new Map();
+    for (const f of files) if (f !== main[0]) plots.set(f.name, await f.text());
+    const text = await main[0].text();
+    const recs = /\.csv$/i.test(main[0].name) ? E.loadCsv(text, plots) : E.loadJsonl(text, plots);
+    if (!recs.length) return void ($("loadMsg").textContent = `${main[0].name} has no shipments. Expected columns are in the CSV template.`);
+    start(recs, `${main[0].name} · ${fmt.format(recs.length)} shipments${plots.size ? ` · ${plots.size} plot files` : ""}`);
+  }
+
+  // ------------------------------------------------------------ file
+
+  async function fileAll() {
+    if (!sandbox || filing) return;
+    filing = true;
+    const ready = [...sandbox.ledger.values()].filter((r) => r.state === "READY");
+    let i = 0;
+    const worker = async () => { while (i < ready.length) await sandbox.submitOne(ready[i++]); };
+    const tick = setInterval(render, 150);
+    render();
+    await Promise.all([worker(), worker(), worker(), worker()]);
+    clearInterval(tick);
+    filing = false;
+    const poll = async () => {
+      const pending = await sandbox.poll();
+      render();
+      if (pending) pollTimer = setTimeout(poll, 600);
+    };
+    pollTimer = setTimeout(poll, 300);
+    render();
+  }
+
+  // ------------------------------------------------------------ render
+
+  const all = () => (sandbox ? [...sandbox.ledger.values()] : []);
+  const color = (v) => `var(${v})`;
+  const errorsOf = (r) => (r.issues || []).filter((i) => i.level === "error");
+  const pct = (n, total) => `${total ? (n / total) * 100 : 0}%`;
+
+  function bar(id, parts, total) {
+    $(id).innerHTML = parts.filter((p) => p[1]).map(([cls, n]) => `<i class="${cls}" style="width:${pct(n, total)}"></i>`).join("");
+  }
+
+  function render() {
+    const rows = all(), total = rows.length, c = sandbox ? sandbox.counts() : {};
+    const fix = c.INVALID || 0, risk = c.BLOCKED_RISK || 0, ok = total - fix - risk;
+
+    // step 2
+    $("s1").classList.toggle("done", total > 0);
+    $("s2").classList.toggle("done", total > 0);
+    $("verdict").innerHTML = total
+      ? `<b>${fmt.format(ok)}</b> of ${fmt.format(total)} shipments are ready to file`
+      : "Load a file to see what can be filed.";
+    bar("checkBar", [["c-ready", ok], ["c-fix", fix], ["c-risk", risk]], total);
+    $("checkLegend").innerHTML = total
+      ? [["--mint", "Ready", ok], ["--amber", "Fix data", fix], ["--coral", "Risk-held", risk]]
+          .map(([v, l, n]) => `<span style="--c:${color(v)}">${l} <b>${fmt.format(n)}</b></span>`).join("")
+      : "";
+    const counts = {};
+    for (const r of rows) {
+      if (r.state === "INVALID") for (const code of new Set(errorsOf(r).map((i) => i.code))) counts[code] = (counts[code] || 0) + 1;
+    }
+    if (risk) counts.RISK = risk;
+    const ranked = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    const li = ([code, n]) => `<li style="--c:${color(code === "RISK" ? "--coral" : "--amber")}"><span>${esc(PROBLEMS[code] || code)}</span><b>${fmt.format(n)}</b></li>`;
+    $("problems").innerHTML = ranked.slice(0, 3).map(li).join("") || (total ? `<li style="--c:var(--mint)"><span>No problems found. Every shipment can be filed.</span></li>` : "");
+    $("allWrap").hidden = ranked.length <= 3;
+    $("allSummary").textContent = `Show all ${ranked.length} problem types`;
+    $("allProblems").innerHTML = ranked.slice(3).map(li).join("");
+
+    // step 3
+    const readyN = c.READY || 0, sent = (c.SUBMITTING || 0) + (c.SUBMITTED || 0), done = c.DONE || 0, rejected = c.REJECTED || 0;
+    const filedTotal = sent + done + rejected + (c.WITHDRAWN || 0);
+    $("s3").classList.toggle("done", filedTotal > 0 && !sent && !filing);
+    const btn = $("fileBtn");
+    btn.disabled = filing || !readyN;
+    btn.textContent = filing ? "Filing…" : readyN ? `File ${fmt.format(readyN)} shipment${readyN === 1 ? "" : "s"}` : filedTotal ? "All ready shipments filed" : "File shipments";
+    $("fileBar").hidden = !filedTotal;
+    bar("fileBar", [["c-ready", done], ["c-wait", sent], ["c-risk", rejected], ["", readyN]], filedTotal + readyN);
+    $("outcome").innerHTML = !filedTotal
+      ? "Ready shipments are signed and sent to TRACES, which returns a reference and verification number for each."
+      : sent
+        ? `Waiting for TRACES on <b>${fmt.format(sent)}</b> · <b>${fmt.format(done)}</b> numbers issued`
+        : `<b>${fmt.format(done)}</b> filed with reference numbers${rejected ? ` · <b>${fmt.format(rejected)}</b> rejected by TRACES` : ""}`;
+
+    renderRows();
+  }
+
+  function renderRows() {
+    const only = $("onlyProblems").checked;
+    const rows = all().filter((r) => !only || ["INVALID", "BLOCKED_RISK", "REJECTED"].includes(r.state));
+    $("copy").disabled = !all().length;
+    if (!rows.length) {
+      $("rows").innerHTML = `<tr><td colspan="4" class="empty">${all().length ? "No problems. Every shipment is ready or filed." : "Shipments appear here once a file is loaded."}</td></tr>`;
+      return;
+    }
+    const html = [];
+    for (const r of rows.slice(0, RENDER_LIMIT)) {
+      const [label, v] = STATUS[r.state] || [r.state, "--muted"];
+      html.push(`<tr class="item${open === r.ref ? " open" : ""}" data-ref="${esc(r.ref)}" tabindex="0" aria-expanded="${open === r.ref}">
+        <td class="code">${esc(r.ref)}</td><td><span class="st" style="--c:${color(v)}">${label}</span></td>
+        <td class="code">${esc(r.reference || "")}</td><td class="code">${esc(r.verification || "")}</td></tr>`);
+      if (open === r.ref) html.push(`<tr class="more"><td colspan="4">${detail(r)}</td></tr>`);
+    }
+    if (rows.length > RENDER_LIMIT)
+      html.push(`<tr><td colspan="4" class="empty">Showing ${RENDER_LIMIT} of ${fmt.format(rows.length)}. Copy results to get every row.</td></tr>`);
+    // Keep an open API request panel open across live re-renders.
+    const xmlOpen = !!document.querySelector("tr.more details[open]");
+    $("rows").innerHTML = html.join("");
+    const det = document.querySelector("tr.more details");
+    if (det) {
+      det.open = xmlOpen;
+      sandbox.previewEnvelope(open).then((t) => { const x = $("xml"); if (x) x.textContent = t; });
+    }
+  }
+
+  function detail(r) {
+    const s = r.statement, c0 = s && s.commodities[0];
+    let main;
+    if (r.state === "DONE")
+      main = `<div class="nums"><div><span>Reference number</span><b>${esc(r.reference)}</b></div><div><span>Verification number</span><b>${esc(r.verification)}</b></div><button class="ghost" data-act="copy-nums">Copy numbers</button></div>`;
+    else if (r.state === "INVALID")
+      main = `<div class="why">${errorsOf(r).map((i) => `<div>${esc(PROBLEMS[i.code] || i.code)}<small>${esc(i.path ? `${i.path}: ` : "")}${esc(i.message)}</small></div>`).join("")}</div>`;
+    else if (r.state === "BLOCKED_RISK")
+      main = `<div class="why"><div>Held back: DEFORRO risk must be negligible, or mitigated, before filing.<small>${esc(r.gate)}</small></div></div>`;
+    else if (r.state === "REJECTED")
+      main = `<div class="why"><div>TRACES rejected this statement.<small>${esc(r.error || "")}</small></div></div>`;
+    else if (r.state === "READY") main = `<div class="why"><div>Passed every check. Ready to file.</div></div>`;
+    else main = `<div class="why"><div>Sent. Waiting for TRACES to issue numbers.<small>UUID ${esc(r.uuid || "")}</small></div></div>`;
+    const meta = c0 ? `${esc(c0.description)} · HS ${esc(c0.hs_heading)}${c0.net_weight != null ? ` · ${fmt.format(c0.net_weight)} kg` : ""}${s.risk ? ` · risk ${esc(s.risk.level)}` : ""}` : "";
+    const trail = r.events.map((e) => `<li><time>${e.at.toLocaleTimeString("en-GB")}</time>${esc(e.event)}</li>`).join("");
+    return `${main}${meta ? `<div class="meta">${meta}</div>` : ""}<ol class="trail" aria-label="Audit trail">${trail}</ol>
+      ${s ? `<details><summary>View API request</summary><pre class="xml" id="xml">Building…</pre></details>` : ""}`;
+  }
+
+  // ------------------------------------------------------------ copy
+
+  function resultsCsv() {
+    const q = (v) => { const t = String(v ?? ""); return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
+    const lines = ["internal_reference,status,reference_number,verification_number,problem"];
+    for (const r of all()) {
+      const problem = r.state === "INVALID" ? errorsOf(r).map((i) => PROBLEMS[i.code] || i.code).join("; ") : r.gate || (r.state === "REJECTED" ? r.error : "");
+      lines.push([r.ref, (STATUS[r.state] || [r.state])[0], r.reference, r.verification, problem].map(q).join(","));
+    }
+    return lines.join("\n");
+  }
+
+  async function copy(text, msgEl, done, fallback) {
+    try {
+      await navigator.clipboard.writeText(text);
+      msgEl.textContent = done; msgEl.style.color = "var(--mint)";
+      if (fallback) fallback.hidden = true;
+    } catch (e) {
+      msgEl.textContent = "Copying is blocked here. Select the text below and copy it.";
+      msgEl.style.color = "";
+      if (fallback) { fallback.value = text; fallback.hidden = false; fallback.select(); }
+    }
+  }
+
+  // ------------------------------------------------------------ events
+
+  $("sample").addEventListener("click", loadSample);
+  $("template").addEventListener("click", () => SITE
+    ? download("deforro-shipments-template.csv", TEMPLATE, $("loadMsg"), "Template downloaded. Fill in one row per plot.")
+    : copy(TEMPLATE, $("loadMsg"), "CSV template copied. Paste it into a spreadsheet, one row per plot.", $("csvBox")));
+  $("file").addEventListener("change", (e) => { loadFiles(e.target.files); e.target.value = ""; });
+  const drop = $("drop");
+  ["dragenter", "dragover"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave", "drop"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", (e) => loadFiles(e.dataTransfer.files));
+  $("fileBtn").addEventListener("click", fileAll);
+  $("onlyProblems").addEventListener("change", renderRows);
+  $("copy").addEventListener("click", () => SITE
+    ? download(`dds-results-${new Date().toISOString().slice(0, 10)}.csv`, resultsCsv(), $("copyMsg"), `${fmt.format(all().length)} rows downloaded.`)
+    : copy(resultsCsv(), $("copyMsg"), `${fmt.format(all().length)} rows copied as CSV.`, $("csvBox")));
+  const toggleRow = (tr) => { if (!tr) return; open = open === tr.dataset.ref ? null : tr.dataset.ref; renderRows(); };
+  $("rows").addEventListener("click", (e) => {
+    if (e.target.closest("[data-act]")) {
+      const r = sandbox.ledger.get(open);
+      copy(`${r.reference} ${r.verification}`, $("copyMsg"), `Numbers for ${r.ref} copied.`);
+      return;
+    }
+    if (e.target.closest("tr.more")) return;
+    toggleRow(e.target.closest("tr.item"));
+  });
+  $("rows").addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.matches("tr.item")) toggleRow(e.target); });
+
+  loadSample();
+})();
+</script>
+</body>
+</html>
