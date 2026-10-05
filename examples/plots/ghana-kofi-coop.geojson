@@ -1,0 +1,39 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "ProducerCountry": "GH",
+        "Area": 6.5
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -1.623451,
+              6.712345
+            ],
+            [
+              -1.620112,
+              6.712345
+            ],
+            [
+              -1.620112,
+              6.714987
+            ],
+            [
+              -1.623451,
+              6.714987
+            ],
+            [
+              -1.623451,
+              6.712345
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}

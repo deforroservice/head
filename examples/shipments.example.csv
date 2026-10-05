@@ -1,0 +1,4 @@
+internal_reference,activity_type,country_of_activity,border_cross_country,description,hs_heading,net_weight_kg,supplementary_unit,supplementary_unit_qualifier,scientific_name,common_name,producer_country,producer_name,geojson_file,risk_level,risk_score
+DEF-CSV-0001,IMPORT,BE,BE,"Cocoa beans, whole, raw",1801,5000,,,Theobroma cacao,Cacao,GH,Kofi Cooperative,plots/ghana-kofi-coop.geojson,negligible,0.02
+DEF-CSV-0001,IMPORT,BE,BE,"Cocoa beans, whole, raw",1801,5000,,,Theobroma cacao,Cacao,GH,Ama Farms,plots/ghana-kofi-coop.geojson,negligible,0.02
+DEF-CSV-0002,IMPORT,NL,NL,Sawn tropical wood,4407,200,20,MTQ,Triplochiton scleroxylon,Wawa,GH,Ashanti Timber,plots/ghana-kofi-coop.geojson,high,0.81

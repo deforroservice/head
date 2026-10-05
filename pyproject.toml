@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "deforro-traces"
+version = "0.1.0"
+description = "Bulk Due Diligence Statement submission from DEFORRO to the EUDR Information System (TRACES NT), with a local sandbox"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[project.scripts]
+deforro-traces = "deforro_traces.cli:main"
+
+[tool.setuptools]
+packages = ["deforro_traces"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
