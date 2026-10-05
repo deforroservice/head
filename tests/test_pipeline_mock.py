@@ -132,6 +132,8 @@ def test_wrong_client_id_is_rejected(mock, client):
 
 def test_transient_faults_are_retried(client, ledger, mock):
     mock.config.fault_rate = 0.3
+    # 0.3**20 per record: exhausting retries is effectively impossible, so no flake.
+    client.retry = RetryPolicy(attempts=20, base_delay=0.001, max_delay=0.005)
     counts = BulkUploader(client, ledger, PipelineConfig(concurrency=8)).run(
         loaded(r) for r in generate(60, invalid_rate=0, risky_rate=0)
     )
