@@ -1,0 +1,711 @@
+<title>DEFORRO DDS Sandbox</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800;900&family=IBM+Plex+Mono:wght@400;500&family=Public+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: forest-green report sheet; numbered sections follow the real filing sequence
+   (pre-flight -> file -> results), closed by the cream "are you EUDR-ready" band. */
+:root {
+  color-scheme: dark;
+  --forest: #0c3a2b;
+  --forest-deep: #082c20;
+  --panel: #10442f;
+  --line: rgba(205, 236, 219, 0.16);
+  --ink: #f3f7f2;
+  --muted: #a8c4b6;
+  --mint: #8de2bd;
+  --amber: #f39a4b;
+  --coral: #ef7564;
+  --sky: #9ccbe8;
+  --cream: #f2ebda;
+  --cream-ink: #123a2b;
+  --display: "Archivo", "Arial Black", "Helvetica Neue", Arial, sans-serif;
+  --body: "Public Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+* { box-sizing: border-box; }
+body { background: var(--forest); color: var(--ink); font: 15px/1.55 var(--body); }
+.wrap { max-width: 1120px; margin: 0 auto; padding-inline: clamp(16px, 4vw, 40px); }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--mint); outline-offset: 2px; }
+.mono { font-family: var(--mono); }
+.kicker { font: 500 11.5px/1 var(--mono); letter-spacing: .22em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 10px; }
+.kicker::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 0 3px rgba(243,154,75,.2); }
+
+/* hero */
+.hero { position: relative; overflow: hidden; padding-block: 36px 28px; border-bottom: 1px solid var(--line); }
+.hero .rings { position: absolute; right: -140px; top: -160px; width: 520px; height: 520px; pointer-events: none; opacity: .5; }
+.hero .rings span { position: absolute; inset: 0; border: 1px solid var(--line); border-radius: 50%; }
+.hero .rings span:nth-child(2) { inset: 70px; } .hero .rings span:nth-child(3) { inset: 140px; }
+h1 { font: 900 clamp(34px, 6.4vw, 64px)/0.98 var(--display); text-transform: uppercase; letter-spacing: -0.01em; margin: 18px 0 16px; text-wrap: balance; max-width: 18ch; }
+h1 em { font-style: normal; color: var(--mint); }
+.lede { max-width: 60ch; color: #d8e6de; font-size: 16.5px; margin: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+.chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px; font-size: 13px; color: #dbe9e1; }
+.chip b { font: 500 12px var(--mono); color: var(--mint); }
+.chip svg { width: 15px; height: 15px; stroke: var(--mint); fill: none; stroke-width: 1.6; }
+.privacy { margin-top: 18px; display: flex; gap: 10px; align-items: flex-start; font-size: 13px; color: var(--muted); max-width: 70ch; }
+.privacy svg { flex: none; width: 16px; height: 16px; stroke: var(--mint); fill: none; stroke-width: 1.8; margin-top: 2px; }
+
+/* data source */
+.source { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; padding-block: 24px; }
+.drop { border: 1.5px dashed rgba(141,226,189,.45); border-radius: 14px; padding: 18px 20px; display: flex; gap: 16px; align-items: center; cursor: pointer; transition: background .15s; min-width: 0; }
+.drop:hover, .drop.over { background: rgba(141,226,189,.07); }
+.drop svg { flex: none; width: 34px; height: 34px; stroke: var(--mint); fill: none; stroke-width: 1.5; }
+.drop strong { display: block; font-weight: 600; }
+.drop small { color: var(--muted); font-size: 13px; }
+.loaded { border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.loaded .label { font: 500 11px var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
+.loaded .name { font-weight: 600; overflow-wrap: anywhere; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.btn { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 7px 14px; font-size: 13.5px; cursor: pointer; }
+.btn:hover:not(:disabled) { border-color: var(--mint); color: var(--mint); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.primary { background: var(--mint); color: var(--forest-deep); border-color: var(--mint); font-weight: 700; padding: 11px 20px; font-size: 15px; }
+.btn.primary:hover:not(:disabled) { background: #a9ecd0; color: var(--forest-deep); }
+.msg { font-size: 13px; color: var(--amber); min-height: 1em; }
+select.btn { appearance: none; padding-right: 14px; background: transparent; }
+select.btn option { background: var(--forest-deep); }
+
+/* sections */
+section { padding-block: 34px; border-top: 1px solid var(--line); }
+.sh { display: flex; align-items: baseline; gap: 14px; margin-bottom: 24px; }
+.sh .n { font: 500 13px var(--mono); color: var(--amber); }
+h2 { font: 900 clamp(21px, 3vw, 28px)/1.1 var(--display); text-transform: uppercase; margin: 0; letter-spacing: .005em; text-wrap: balance; }
+
+.pre { display: grid; grid-template-columns: 1fr 1.15fr 1.25fr; gap: 0; }
+.pre > div { padding: 4px 28px; min-width: 0; }
+.pre > div + div { border-left: 1px solid var(--line); }
+.pre > div:first-child { padding-left: 0; }
+.ico { width: 42px; height: 42px; border-radius: 50%; border: 1.5px solid var(--amber); display: grid; place-items: center; margin-bottom: 18px; }
+.ico svg { width: 20px; height: 20px; stroke: var(--amber); fill: none; stroke-width: 1.8; }
+.pre p { margin: 0 0 12px; }
+.pre p.small { font-size: 13px; color: var(--muted); }
+.big { font: 800 clamp(48px, 7vw, 68px)/1 var(--mono); letter-spacing: -0.03em; color: var(--mint); font-variant-numeric: tabular-nums; }
+.big-sub { color: #d8e6de; max-width: 30ch; margin-top: 6px; font-size: 14px; }
+.donuts { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 22px; }
+.donut { display: flex; flex-direction: column; align-items: center; gap: 8px; font-size: 13px; color: #d8e6de; }
+.donut svg { display: block; }
+.donut .t { font: 600 15px var(--mono); fill: var(--ink); }
+.donut.sm .t { font-size: 12.5px; }
+.mini-label { font: 500 11px var(--mono); letter-spacing: .18em; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; }
+.comm { display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 14px 10px; }
+
+.fixes { margin-top: 30px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 32px; }
+.fix { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; font-size: 13.5px; align-items: baseline; }
+.fix .bar { grid-column: 1 / -1; height: 5px; border-radius: 3px; background: rgba(205,236,219,.1); overflow: hidden; }
+.fix .bar i { display: block; height: 100%; background: var(--amber); border-radius: 3px; }
+.fix .bar i.risk { background: var(--coral); }
+.fix b { font: 500 13px var(--mono); font-variant-numeric: tabular-nums; }
+
+/* submit */
+.flow { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.step { padding: 14px 16px; min-width: 0; }
+.step + .step { border-left: 1px solid var(--line); }
+.step .k { font: 500 10.5px var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
+.step .v { font: 600 24px var(--mono); font-variant-numeric: tabular-nums; margin-top: 4px; }
+.step .d { font-size: 12.5px; color: var(--muted); }
+.step.on .v { color: var(--mint); }
+.controls { display: grid; grid-template-columns: 1fr 1fr auto; gap: 20px 28px; align-items: end; margin-top: 22px; }
+.ctl label { display: flex; justify-content: space-between; font-size: 13px; color: #d8e6de; margin-bottom: 6px; gap: 12px; }
+.ctl label output { font-family: var(--mono); color: var(--mint); }
+.ctl small { display: block; color: var(--muted); font-size: 12px; margin-top: 4px; }
+input[type=range] { width: 100%; accent-color: var(--mint); }
+.progress { height: 8px; background: rgba(205,236,219,.1); border-radius: 4px; overflow: hidden; margin-top: 22px; display: flex; }
+.progress i { display: block; height: 100%; transition: width .25s; }
+.progress .p-done { background: var(--mint); } .progress .p-wait { background: var(--sky); } .progress .p-rej { background: var(--coral); }
+.status-line { font: 13px var(--mono); color: var(--muted); margin-top: 10px; min-height: 1.4em; }
+
+/* results */
+.filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
+.pillbtn { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 5px 12px; font-size: 13px; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
+.pillbtn[aria-pressed=true] { background: var(--ink); color: var(--forest-deep); border-color: var(--ink); }
+.pillbtn span { font: 12px var(--mono); opacity: .75; }
+.search { margin-left: auto; background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; min-width: 0; width: 220px; max-width: 100%; }
+.tablebox { overflow: auto; max-height: 560px; border: 1px solid var(--line); border-radius: 14px; }
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 760px; }
+th { text-align: left; font: 500 10.5px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); padding: 11px 14px; border-bottom: 1px solid var(--line); background: var(--forest-deep); position: sticky; top: 0; }
+td { padding: 9px 14px; border-bottom: 1px solid rgba(205,236,219,.08); vertical-align: middle; }
+tbody tr { cursor: pointer; }
+tbody tr:hover { background: rgba(141,226,189,.06); }
+tbody tr.sel { background: rgba(141,226,189,.12); }
+td.num, td.code { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+td.num { text-align: right; }
+td.dim { color: var(--muted); }
+.state { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; padding: 2px 9px 2px 7px; border-radius: 999px; white-space: nowrap; }
+.state::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.st-DONE { color: var(--mint); background: rgba(141,226,189,.12); }
+.st-SUBMITTED, .st-SUBMITTING { color: var(--sky); background: rgba(156,203,232,.12); }
+.st-READY { color: var(--ink); background: rgba(243,247,242,.08); }
+.st-INVALID { color: var(--amber); background: rgba(243,154,75,.13); }
+.st-BLOCKED_RISK, .st-REJECTED { color: var(--coral); background: rgba(239,117,100,.13); }
+.st-WITHDRAWN { color: var(--muted); background: rgba(168,196,182,.1); }
+.more { display: flex; justify-content: center; padding: 12px; }
+
+.detail { margin-top: 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); padding: 20px 22px; display: grid; grid-template-columns: 1fr 1fr; gap: 22px 32px; }
+.detail h3 { font: 800 20px var(--display); margin: 4px 0 2px; overflow-wrap: anywhere; }
+.detail .full { grid-column: 1 / -1; min-width: 0; }
+.detail > div { min-width: 0; }
+.kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 16px; font-size: 13.5px; margin: 0; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; overflow-wrap: anywhere; }
+.official { display: flex; gap: 24px; flex-wrap: wrap; margin-top: 10px; }
+.official div { display: flex; flex-direction: column; }
+.official span { font: 500 10.5px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.official b { font: 600 20px var(--mono); color: var(--mint); letter-spacing: .03em; }
+.issues { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; font-size: 13.5px; }
+.issues li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; }
+.issues .lv { font: 500 11px var(--mono); padding: 2px 6px; border-radius: 4px; background: rgba(243,154,75,.15); color: var(--amber); height: fit-content; }
+.issues .lv.w { background: rgba(156,203,232,.12); color: var(--sky); }
+.issues small { display: block; color: var(--muted); font-family: var(--mono); font-size: 11.5px; }
+.timeline { list-style: none; margin: 0; padding: 0 0 0 14px; border-left: 1px solid var(--line); font-size: 13px; display: grid; gap: 7px; }
+.timeline li { position: relative; }
+.timeline li::before { content: ""; position: absolute; left: -18px; top: 6px; width: 7px; height: 7px; border-radius: 50%; background: var(--mint); }
+.timeline time { font: 11.5px var(--mono); color: var(--muted); margin-right: 8px; }
+.timeline em { font-style: normal; color: var(--muted); overflow-wrap: anywhere; }
+pre.xml { margin: 8px 0 0; max-height: 340px; overflow: auto; background: var(--forest-deep); border: 1px solid var(--line); border-radius: 10px; padding: 14px; font: 12px/1.5 var(--mono); color: #cfe3d8; white-space: pre; }
+.sub-h { font: 500 11px var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+textarea.csv { width: 100%; height: 120px; margin-top: 10px; background: var(--forest-deep); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; font: 12px var(--mono); padding: 10px; }
+.empty { padding: 28px; text-align: center; color: var(--muted); }
+
+/* cream band */
+.band { background: var(--cream); color: var(--cream-ink); margin-top: 34px; display: grid; grid-template-columns: minmax(200px, 300px) 1fr auto; align-items: stretch; }
+.band .tab { background: var(--forest-deep); color: var(--ink); font: 900 20px/1.1 var(--display); text-transform: uppercase; padding: 26px 46px 26px clamp(16px, 4vw, 40px); clip-path: polygon(0 0, calc(100% - 26px) 0, 100% 50%, calc(100% - 26px) 100%, 0 100%); display: flex; align-items: center; }
+.band .txt { padding: 22px 28px; font-size: 15px; display: flex; align-items: center; max-width: 72ch; }
+.band .txt b { font-weight: 700; }
+.band .icon { padding: 20px clamp(16px, 4vw, 40px) 20px 10px; display: flex; align-items: center; }
+.band .icon svg { width: 40px; height: 40px; stroke: var(--cream-ink); fill: none; stroke-width: 1.5; }
+.band .icon svg .acc { stroke: var(--amber); }
+footer { background: var(--forest-deep); color: var(--muted); font: 12px/1.6 var(--mono); padding-block: 18px; }
+
+@media (max-width: 880px) {
+  .source, .controls, .detail { grid-template-columns: 1fr; }
+  .pre { grid-template-columns: 1fr; gap: 26px; }
+  .pre > div { padding: 0; }
+  .pre > div + div { border-left: 0; border-top: 1px solid var(--line); padding-top: 24px; }
+  .fixes { grid-template-columns: 1fr; }
+  .flow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .step + .step { border-left: 0; }
+  .step { border-bottom: 1px solid var(--line); }
+  .band { grid-template-columns: 1fr; }
+  .band .tab { clip-path: none; padding-right: 16px; }
+  .band .icon { display: none; }
+  .search { margin-left: 0; width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<header class="hero">
+  <div class="rings" aria-hidden="true"><span></span><span></span><span></span></div>
+  <div class="wrap">
+    <div class="kicker">DEFORRO · TRACES sandbox · EUDR due diligence</div>
+    <h1>DDS submission <em>sandbox</em></h1>
+    <p class="lede">Load a DEFORRO shipment export and watch it go through the same steps as a real filing. The page checks plot geometry and data quality, holds back anything not at negligible risk, and signs each statement. It then files to a simulated EU Information System and collects the official reference and verification numbers.</p>
+    <div class="chips" id="chips"></div>
+    <div class="privacy">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg>
+      <span>Everything runs in this browser tab. Files you add are never uploaded or stored, and nothing is sent to the real TRACES system. Closing the tab erases the session.</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="source">
+    <label class="drop" id="drop" for="file">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 15v4a1 1 0 001 1h14a1 1 0 001-1v-4"/></svg>
+      <span>
+        <strong>Drop a DEFORRO export here, or choose files</strong>
+        <small>One .csv or .jsonl shipment file, plus any .geojson plot files it refers to. Up to 25 MB in total.</small>
+      </span>
+      <input id="file" type="file" multiple accept=".csv,.jsonl,.ndjson,.json,.geojson" hidden>
+    </label>
+    <div class="loaded">
+      <div class="label">Loaded now</div>
+      <div class="name" id="sourceName">Nothing yet</div>
+      <div class="row">
+        <select class="btn" id="sampleSize" aria-label="Sample size">
+          <option value="100">100 shipments</option>
+          <option value="500" selected>500 shipments</option>
+          <option value="2000">2,000 shipments</option>
+        </select>
+        <button class="btn" id="loadSample">Load sample data</button>
+        <button class="btn" id="reset">Start over</button>
+      </div>
+      <div class="msg" id="loadMsg" role="status"></div>
+    </div>
+  </div>
+</div>
+
+<section>
+  <div class="wrap">
+    <div class="sh"><span class="n">01</span><h2>Is this file ready to file?</h2></div>
+    <div class="pre">
+      <div>
+        <div class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12l5 5L20 6"/></svg></div>
+        <p>Before anything is signed, each shipment goes through the EUDR pre-flight rules and the DEFORRO risk gate.</p>
+        <p class="small">Pre-flight covers closed plot boundaries, coordinate ranges, plots over 4 ha given as points, HS headings, countries and quantities. Only shipments at negligible risk, or mitigated to it, can be placed on the EU market.</p>
+      </div>
+      <div>
+        <div class="big" id="readyPct">–</div>
+        <div class="big-sub" id="readySub">of shipments can be filed as they are</div>
+        <div class="donuts" id="mainDonuts"></div>
+      </div>
+      <div>
+        <div class="mini-label">Ready share by commodity</div>
+        <div class="comm" id="commDonuts"></div>
+      </div>
+    </div>
+    <div class="fixes" id="fixes"></div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="sh"><span class="n">02</span><h2>File to sandbox TRACES</h2></div>
+    <div class="flow" id="flow"></div>
+    <div class="controls">
+      <div class="ctl">
+        <label for="faultRate">Server errors <output id="faultOut">10%</output></label>
+        <input id="faultRate" type="range" min="0" max="40" step="5" value="10">
+        <small>Share of requests the simulated TRACES answers with HTTP 503. Each one is retried with a fresh signature.</small>
+      </div>
+      <div class="ctl">
+        <label for="rejectRate">Rejected after processing <output id="rejectOut">3%</output></label>
+        <input id="rejectRate" type="range" min="0" max="30" step="1" value="3">
+        <small>Share of accepted statements that TRACES later marks REJECTED.</small>
+      </div>
+      <button class="btn primary" id="submit" disabled>File shipments</button>
+    </div>
+    <div class="progress" aria-hidden="true"><i class="p-done" id="pDone"></i><i class="p-wait" id="pWait"></i><i class="p-rej" id="pRej"></i></div>
+    <div class="status-line" id="statusLine" role="status"></div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="sh"><span class="n">03</span><h2>Statements and official numbers</h2></div>
+    <div class="filters" id="filters"></div>
+    <div class="tablebox">
+      <table>
+        <thead><tr><th>Internal ref</th><th>Status</th><th>Commodity</th><th>Origin → EU</th><th style="text-align:right">Net kg</th><th>Plots</th><th>Reference no.</th><th>Verification</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div class="more" id="more" hidden><button class="btn" id="moreBtn">Show more</button></div>
+    </div>
+    <div class="row" style="margin-top:14px">
+      <button class="btn" id="copyCsv">Copy results as CSV</button>
+      <span class="msg" id="csvMsg" role="status"></span>
+    </div>
+    <textarea class="csv" id="csvBox" hidden readonly aria-label="Results CSV"></textarea>
+    <div id="detail"></div>
+  </div>
+</section>
+
+<div class="band">
+  <div class="tab">Is your file EUDR-ready?</div>
+  <div class="txt" id="bandText">Load a file to see what needs fixing before it can be filed.</div>
+  <div class="icon"><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="10" y="8" width="24" height="32" rx="2"/><path d="M17 8V5h10v3"/><path d="M15 18h14M15 24h14M15 30h8"/><circle class="acc" cx="34" cy="34" r="7"/><path class="acc" d="M31 34l2 2 4-4"/></svg></div>
+</div>
+<footer><div class="wrap">Sandbox only. Uses the simulated EUDRDueDiligenceStatementServiceV3 and sandbox credentials; no connection to the EU Information System. Applies the same rules as the deforro-traces command-line tool.</div></footer>
+
+<script>
+/*ENGINE*/
+</script>
+<script>
+(() => {
+  "use strict";
+  const E = window.DeforroEngine;
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const fmt = new Intl.NumberFormat("en-GB");
+  const MAX_BYTES = 25 * 1024 * 1024;
+  const PAGE = 150;
+
+  const ISSUE_LABELS = {
+    GEO_RING: "Plot boundary not closed or too few points",
+    GEO_RANGE: "Coordinates out of range (latitude and longitude swapped?)",
+    GEO_POINT_AREA: "Plot over 4 ha given as a single point",
+    GEO_MISSING: "Producer without geolocation",
+    GEO_TYPE: "Geolocation is not a GeoJSON FeatureCollection",
+    GEO_EMPTY: "GeoJSON has no plots",
+    GEO_GEOMETRY: "Unsupported geometry type",
+    GEO_COORDS: "Malformed coordinates",
+    GEO_SIZE: "GeoJSON too large",
+    BORDER: "Border-crossing country missing",
+    COUNTRY: "Country code is not ISO 3166 alpha-2",
+    HS: "HS heading malformed",
+    MEASURE: "Quantity missing or invalid",
+    PRODUCER: "Commodity without producers",
+    SPECIES: "Species name missing",
+    ACTIVITY: "Unknown activity type",
+    REF: "Internal reference missing",
+    GROUPED: "Grouped declaration reference malformed",
+    DESCRIPTION: "Description of goods missing",
+    LOAD: "Row could not be read",
+    DUPLICATE: "Internal reference used twice",
+  };
+  const STATE_LABELS = {
+    READY: "Ready", INVALID: "Fix data", BLOCKED_RISK: "Risk-held", SUBMITTING: "Sending",
+    SUBMITTED: "Awaiting TRACES", DONE: "Available", REJECTED: "Rejected", WITHDRAWN: "Withdrawn",
+  };
+  const COMMODITY_ICONS = {
+    Coffee: '<path d="M6 4c6 0 9 4 9 8s-3 8-9 8"/><path d="M9 5c-2 3-2 11 0 14"/>',
+    Cocoa: '<ellipse cx="12" cy="12" rx="5.5" ry="8.5"/><path d="M12 3.5v17M8.5 7c2 1 5 1 7 0M8.5 17c2-1 5-1 7 0"/>',
+    Timber: '<path d="M12 3l5 7h-3l4 6H6l4-6H7z"/><path d="M12 16v5"/>',
+    Rubber: '<path d="M5 20c5-1 8-5 8-12"/><path d="M13 8c2-3 5-4 7-4-1 3-3 5-7 6"/><circle cx="6" cy="9" r="1.6"/>',
+    "Palm oil": '<path d="M12 21V10"/><path d="M12 10C9 6 5 6 3 7M12 10c3-4 7-4 9-3M12 10C10 5 11 3 12 2M12 10c2-5 1-7 0-8"/>',
+    Soya: '<path d="M7 19c-3-6 2-14 10-14-1 8-5 13-10 14z"/><circle cx="10" cy="14" r="1.2"/><circle cx="13" cy="10" r="1.2"/>',
+    Cattle: '<path d="M5 9c0-3 3-4 7-4s7 1 7 4v4c0 4-3 7-7 7s-7-3-7-7z"/><path d="M5 8L2 6M19 8l3-2"/>',
+    Other: '<circle cx="12" cy="12" r="7"/>',
+  };
+
+  let sandbox = null;
+  let sourceLabel = "";
+  let filter = "all";
+  let query = "";
+  let shown = PAGE;
+  let selected = null;
+  let busy = false;
+  let pollTimer = null;
+
+  // ---------------------------------------------------------------- loading
+
+  function startSession(records, label) {
+    stopPolling();
+    sandbox = new E.Sandbox({ mock: new E.MockTraces({ faultRate: $("faultRate").value / 100, rejectRate: $("rejectRate").value / 100, processingDelayMs: 1800 }) });
+    sandbox.preflight(records);
+    sourceLabel = label;
+    selected = null; shown = PAGE; filter = "all"; query = ""; $("search") && ($("search").value = "");
+    $("csvBox").hidden = true;
+    render();
+  }
+
+  function loadSample() {
+    const n = Number($("sampleSize").value);
+    const records = E.generateSamples(n, { seed: (Date.now() % 100000) | 0 }).map((d) => ({ key: d.internal_reference, statement: E.loadJsonl(JSON.stringify(d))[0].statement, errors: [] }));
+    $("loadMsg").textContent = "";
+    startSession(records, `Sample data · ${fmt.format(n)} synthetic shipments (not real producers)`);
+  }
+
+  async function loadFiles(fileList) {
+    const files = [...fileList];
+    $("loadMsg").textContent = "";
+    if (!files.length) return;
+    const total = files.reduce((s, f) => s + f.size, 0);
+    if (total > MAX_BYTES) { $("loadMsg").textContent = `These files add up to ${(total / 1048576).toFixed(1)} MB. The sandbox takes up to 25 MB; split the export and try again.`; return; }
+    const main = files.filter((f) => /\.(csv|jsonl|ndjson)$/i.test(f.name));
+    if (main.length !== 1) {
+      $("loadMsg").textContent = main.length ? "Add one shipment file at a time (.csv or .jsonl), plus its .geojson plots." : "No shipment file found. Add a .csv or .jsonl export; .geojson files alone are only plots.";
+      return;
+    }
+    const plots = new Map();
+    for (const f of files) {
+      if (f === main[0]) continue;
+      const text = await f.text();
+      plots.set(f.webkitRelativePath || f.name, text);
+      plots.set(f.name, text);
+    }
+    const text = await main[0].text();
+    const records = /\.csv$/i.test(main[0].name) ? E.loadCsv(text, plots) : E.loadJsonl(text, plots);
+    if (!records.length) { $("loadMsg").textContent = `${main[0].name} has no shipments in it.`; return; }
+    startSession(records, `${main[0].name}${plots.size ? ` + ${files.length - 1} plot file${files.length > 2 ? "s" : ""}` : ""} · ${fmt.format(records.length)} shipments`);
+  }
+
+  // ---------------------------------------------------------------- filing
+
+  async function fileAll() {
+    if (!sandbox || busy) return;
+    busy = true;
+    syncMock();
+    const ready = [...sandbox.ledger.values()].filter((r) => r.state === E.S.READY);
+    let i = 0;
+    const started = performance.now();
+    const worker = async () => {
+      while (i < ready.length) {
+        const row = ready[i++];
+        await sandbox.submitOne(row);
+      }
+    };
+    const ticker = setInterval(renderProgress, 120);
+    renderProgress();
+    await Promise.all([worker(), worker(), worker(), worker()]);
+    clearInterval(ticker);
+    busy = false;
+    const secs = ((performance.now() - started) / 1000).toFixed(1);
+    $("statusLine").dataset.last = `Signed and sent ${fmt.format(ready.length)} statements in ${secs}s.`;
+    startPolling();
+    render();
+  }
+
+  function startPolling() {
+    stopPolling();
+    const tick = async () => {
+      const pending = await sandbox.poll();
+      render();
+      if (pending) pollTimer = setTimeout(tick, 700);
+    };
+    pollTimer = setTimeout(tick, 400);
+  }
+  function stopPolling() { if (pollTimer) clearTimeout(pollTimer); pollTimer = null; }
+
+  function syncMock() {
+    if (!sandbox) return;
+    sandbox.mock.faultRate = $("faultRate").value / 100;
+    sandbox.mock.rejectRate = $("rejectRate").value / 100;
+  }
+
+  // ---------------------------------------------------------------- render helpers
+
+  function donut(pct, color, label, size = 92) {
+    const r = size / 2 - 7, c = 2 * Math.PI * r, p = Math.max(0, Math.min(1, pct));
+    return `<div class="donut${size < 80 ? " sm" : ""}">
+      <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" role="img" aria-label="${esc(label)}: ${Math.round(p * 100)}%">
+        <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="rgba(205,236,219,.12)" stroke-width="${size < 80 ? 6 : 8}"/>
+        <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${color}" stroke-width="${size < 80 ? 6 : 8}" stroke-linecap="round"
+          stroke-dasharray="${(c * p).toFixed(2)} ${c.toFixed(2)}" transform="rotate(-90 ${size / 2} ${size / 2})"/>
+        <text class="t" x="50%" y="50%" text-anchor="middle" dominant-baseline="central">${Math.round(p * 100)}%</text>
+      </svg><span>${esc(label)}</span></div>`;
+  }
+
+  const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const rows = () => (sandbox ? [...sandbox.ledger.values()] : []);
+  const stmtOf = (r) => r.statement;
+  const commodityOf = (r) => (stmtOf(r) && stmtOf(r).commodities[0] ? E.commodityName(stmtOf(r).commodities[0].hs_heading) : "Other");
+  const filedOrReady = (r) => !["INVALID", "BLOCKED_RISK"].includes(r.state);
+
+  // ---------------------------------------------------------------- render
+
+  function render() {
+    const all = rows();
+    const total = all.length;
+    $("sourceName").textContent = sourceLabel || "Nothing yet";
+
+    // chips
+    const byComm = {};
+    for (const r of all) byComm[commodityOf(r)] = (byComm[commodityOf(r)] || 0) + 1;
+    const commodities = ["Coffee", "Cocoa", "Timber", "Rubber", "Palm oil", "Soya", "Cattle", "Other"].filter((c) => byComm[c] || ["Coffee", "Cocoa", "Timber", "Rubber", "Palm oil"].includes(c));
+    $("chips").innerHTML = commodities.map((c) => `<span class="chip"><svg viewBox="0 0 24 24" aria-hidden="true">${COMMODITY_ICONS[c]}</svg>${esc(c)}${byComm[c] ? ` <b>${fmt.format(byComm[c])}</b>` : ""}</span>`).join("");
+
+    // pre-flight
+    const invalid = all.filter((r) => r.state === "INVALID").length;
+    const risk = all.filter((r) => r.state === "BLOCKED_RISK").length;
+    const ok = total - invalid - risk;
+    $("readyPct").textContent = total ? `${((ok / total) * 100).toFixed(1)}%` : "–";
+    $("readySub").textContent = total ? `of ${fmt.format(total)} shipments can be filed as they are` : "Load sample data or a DEFORRO export to begin";
+    $("mainDonuts").innerHTML = total ? donut(invalid / total, css("--amber"), "Need data fixes") + donut(risk / total, css("--coral"), "Held by risk gate") : "";
+    $("commDonuts").innerHTML = Object.keys(byComm).sort((a, b) => byComm[b] - byComm[a]).map((c) => {
+      const inC = all.filter((r) => commodityOf(r) === c);
+      return donut(inC.filter(filedOrReady).length / inC.length, css("--mint"), c, 72);
+    }).join("") || `<p class="small" style="color:var(--muted)">Shown once a file is loaded.</p>`;
+
+    // fixes
+    const issueCounts = {};
+    for (const r of all) {
+      if (r.state !== "INVALID" && !(r.issues || []).some((i) => i.level === "error")) continue;
+      for (const code of new Set((r.issues || []).filter((i) => i.level === "error").map((i) => i.code))) issueCounts[code] = (issueCounts[code] || 0) + 1;
+    }
+    const fixList = Object.entries(issueCounts).sort((a, b) => b[1] - a[1]);
+    if (risk) fixList.push(["__RISK", risk]);
+    const maxFix = Math.max(1, ...fixList.map((f) => f[1]));
+    $("fixes").innerHTML = fixList.length ? fixList.slice(0, 8).map(([code, n]) => `
+      <div class="fix"><span>${code === "__RISK" ? "Risk above negligible: needs mitigation before filing" : esc(ISSUE_LABELS[code] || code)}</span><b>${fmt.format(n)}</b>
+      <span class="bar"><i class="${code === "__RISK" ? "risk" : ""}" style="width:${(n / maxFix) * 100}%"></i></span></div>`).join("")
+      : total ? `<div class="fix"><span>No data problems found.</span></div>` : "";
+
+    // flow
+    const c = sandbox ? sandbox.counts() : {};
+    const sent = (c.SUBMITTED || 0) + (c.DONE || 0) + (c.REJECTED || 0) + (c.WITHDRAWN || 0) + (c.SUBMITTING || 0);
+    const steps = [
+      ["Validate", ok + risk, "passed pre-flight"],
+      ["Risk gate", ok, "cleared as negligible"],
+      ["Sign & send", sent, "WS-Security digest"],
+      ["TRACES", c.SUBMITTED || 0, "processing"],
+      ["Official no.", c.DONE || 0, "reference + verification"],
+    ];
+    $("flow").innerHTML = steps.map(([k, v, d], i) => `<div class="step${v && i >= 2 ? " on" : ""}"><div class="k">${esc(k)}</div><div class="v">${fmt.format(v)}</div><div class="d">${esc(d)}</div></div>`).join("");
+
+    const readyN = c.READY || 0;
+    $("submit").disabled = busy || !readyN;
+    $("submit").textContent = busy ? "Filing…" : readyN ? `File ${fmt.format(readyN)} shipment${readyN === 1 ? "" : "s"}` : total ? "Nothing left to file" : "File shipments";
+    renderProgress();
+    renderTable();
+    renderDetail();
+    renderBand(invalid, risk, fixList, c);
+  }
+
+  function renderProgress() {
+    if (!sandbox) { ["pDone", "pWait", "pRej"].forEach((id) => ($(id).style.width = "0")); $("statusLine").textContent = ""; return; }
+    const c = sandbox.counts();
+    const base = Math.max(1, (c.READY || 0) + (c.SUBMITTING || 0) + (c.SUBMITTED || 0) + (c.DONE || 0) + (c.REJECTED || 0) + (c.WITHDRAWN || 0));
+    $("pDone").style.width = `${(((c.DONE || 0) + (c.WITHDRAWN || 0)) / base) * 100}%`;
+    $("pWait").style.width = `${(((c.SUBMITTED || 0) + (c.SUBMITTING || 0)) / base) * 100}%`;
+    $("pRej").style.width = `${((c.REJECTED || 0) / base) * 100}%`;
+    const st = sandbox.stats;
+    const parts = [];
+    if ($("statusLine").dataset.last) parts.push($("statusLine").dataset.last);
+    if (st.requests) parts.push(`${fmt.format(st.requests)} requests, ${fmt.format(st.retries)} server errors absorbed by retries`);
+    if (c.SUBMITTED) parts.push(`waiting for TRACES on ${fmt.format(c.SUBMITTED)}`);
+    else if (c.DONE) parts.push(`${fmt.format(c.DONE)} with official numbers`);
+    $("statusLine").textContent = parts.join(" · ");
+  }
+
+  const FILTERS = [
+    ["all", "All", () => true],
+    ["DONE", "Available", (r) => r.state === "DONE"],
+    ["WAIT", "Awaiting", (r) => ["SUBMITTED", "SUBMITTING", "READY"].includes(r.state)],
+    ["REJECTED", "Rejected", (r) => r.state === "REJECTED"],
+    ["INVALID", "Fix data", (r) => r.state === "INVALID"],
+    ["BLOCKED_RISK", "Risk-held", (r) => r.state === "BLOCKED_RISK"],
+  ];
+
+  function visibleRows() {
+    const f = FILTERS.find((x) => x[0] === filter)[2];
+    const q = query.trim().toLowerCase();
+    return rows().filter((r) => f(r) && (!q || [r.ref, r.reference, r.verification, commodityOf(r)].some((v) => v && String(v).toLowerCase().includes(q))));
+  }
+
+  function renderTable() {
+    const all = rows();
+    $("filters").innerHTML = FILTERS.map(([k, label, f]) => `<button class="pillbtn" data-filter="${k}" aria-pressed="${filter === k}">${label} <span>${fmt.format(all.filter(f).length)}</span></button>`).join("") +
+      `<input class="search" id="search" type="search" placeholder="Search ref, number, commodity" aria-label="Search statements" value="${esc(query)}">`;
+    const list = visibleRows();
+    if (!all.length) { $("rows").innerHTML = `<tr><td colspan="8" class="empty">Statements appear here once a file is loaded.</td></tr>`; $("more").hidden = true; return; }
+    if (!list.length) { $("rows").innerHTML = `<tr><td colspan="8" class="empty">No statements match this filter.</td></tr>`; $("more").hidden = true; return; }
+    $("rows").innerHTML = list.slice(0, shown).map((r) => {
+      const s = stmtOf(r);
+      const c0 = s && s.commodities[0];
+      const plots = s ? s.commodities.reduce((n, c) => n + c.producers.length, 0) : 0;
+      const origin = c0 && c0.producers[0] ? c0.producers[0].country : "–";
+      return `<tr data-ref="${esc(r.ref)}" class="${selected === r.ref ? "sel" : ""}" tabindex="0">
+        <td class="code">${esc(r.ref)}</td>
+        <td><span class="state st-${r.state}">${STATE_LABELS[r.state] || r.state}</span></td>
+        <td>${esc(commodityOf(r))}${c0 ? ` <span class="dim mono">${esc(c0.hs_heading)}</span>` : ""}</td>
+        <td class="code">${esc(origin)} → ${esc((s && (s.border_cross_country || s.country_of_activity)) || "–")}</td>
+        <td class="num">${c0 && c0.net_weight != null ? fmt.format(c0.net_weight) : "–"}</td>
+        <td class="num">${plots || "–"}</td>
+        <td class="code">${esc(r.reference || "")}</td>
+        <td class="code">${esc(r.verification || "")}</td></tr>`;
+    }).join("");
+    $("more").hidden = list.length <= shown;
+    $("moreBtn").textContent = `Show ${fmt.format(Math.min(PAGE, list.length - shown))} more of ${fmt.format(list.length - shown)}`;
+  }
+
+  function renderDetail() {
+    const box = $("detail");
+    const r = selected && sandbox && sandbox.ledger.get(selected);
+    if (!r) { box.innerHTML = rows().length ? `<p class="status-line">Select a statement to see its checks, history and the SOAP request that files it.</p>` : ""; return; }
+    const s = stmtOf(r);
+    const c0 = s && s.commodities[0];
+    const area = s ? s.commodities.flatMap((c) => c.producers).reduce((a, p) => a + (p.geojson ? E.geojsonAreaHectares(p.geojson) : 0), 0) : 0;
+    const issues = r.issues || [];
+    box.innerHTML = `<div class="detail">
+      <div>
+        <span class="state st-${r.state}">${STATE_LABELS[r.state] || r.state}</span>
+        <h3 class="mono">${esc(r.ref)}</h3>
+        ${r.reference ? `<div class="official"><div><span>Reference number</span><b>${esc(r.reference)}</b></div><div><span>Verification</span><b>${esc(r.verification)}</b></div></div>` : ""}
+        <dl class="kv" style="margin-top:14px">
+          ${c0 ? `<dt>Goods</dt><dd>${esc(c0.description)} (HS ${esc(c0.hs_heading)})</dd><dt>Net weight</dt><dd>${c0.net_weight != null ? `${fmt.format(c0.net_weight)} kg` : "–"}</dd>` : ""}
+          ${s ? `<dt>Activity</dt><dd>${esc(s.activity_type)} into ${esc(s.country_of_activity || "–")}</dd>` : ""}
+          ${s ? `<dt>Producers</dt><dd>${esc(s.commodities.flatMap((c) => c.producers).map((p) => p.name || p.country).join(", ") || "–")}</dd>` : ""}
+          ${area ? `<dt>Polygon area</dt><dd>${area.toFixed(1)} ha</dd>` : ""}
+          ${s && s.risk ? `<dt>DEFORRO risk</dt><dd>${esc(s.risk.level)}${s.risk.score != null ? ` (score ${esc(s.risk.score)})` : ""}${s.risk.mitigated ? ", mitigated" : ""}</dd>` : s ? `<dt>DEFORRO risk</dt><dd>No assessment attached</dd>` : ""}
+          ${r.uuid ? `<dt>TRACES UUID</dt><dd class="mono">${esc(r.uuid)}</dd>` : ""}
+          ${r.error ? `<dt>TRACES said</dt><dd>${esc(r.error)}</dd>` : ""}
+          ${r.gate ? `<dt>Risk gate</dt><dd>${esc(r.gate)}</dd>` : ""}
+        </dl>
+        ${r.state === "DONE" ? `<div class="row" style="margin-top:14px"><button class="btn" id="copyNums">Copy numbers</button><button class="btn" id="withdraw">Withdraw this statement</button><span class="msg" id="detailMsg" role="status"></span></div>` : ""}
+      </div>
+      <div>
+        <p class="sub-h">Checks</p>
+        ${issues.length ? `<ul class="issues">${issues.map((i) => `<li><span class="lv ${i.level === "warning" ? "w" : ""}">${i.level === "warning" ? "warn" : "error"}</span><span>${esc(ISSUE_LABELS[i.code] || i.code)}<small>${esc(i.path ? `${i.path}: ` : "")}${esc(i.message)}</small></span></li>`).join("")}</ul>` : `<p style="margin:0">All pre-flight checks passed.</p>`}
+        <p class="sub-h" style="margin-top:18px">History</p>
+        <ol class="timeline">${r.events.map((e) => `<li><time>${e.at.toLocaleTimeString("en-GB")}</time>${esc(e.event)}${e.detail ? ` <em>${esc(e.detail)}</em>` : ""}</li>`).join("")}</ol>
+      </div>
+      ${s ? `<div class="full"><p class="sub-h"><span>SOAP request · submitDds (secrets masked, geometry shortened)</span><button class="btn" id="copyXml">Copy XML</button></p><pre class="xml" id="xml">Building…</pre></div>` : ""}
+    </div>`;
+    if (s) sandbox.previewEnvelope(r.ref).then((xml) => { const el = $("xml"); if (el && selected === r.ref) el.textContent = xml; });
+  }
+
+  function renderBand(invalid, risk, fixList, c) {
+    const total = rows().length;
+    let html;
+    if (!total) html = "Load a file to see what needs fixing before it can be filed.";
+    else if (!invalid && !risk) html = c.DONE ? `<span>All <b>${fmt.format(total)}</b> shipments passed. <b>${fmt.format(c.DONE)}</b> already have official reference and verification numbers.</span>` : `<span>Every shipment passes pre-flight and the risk gate. This file can be filed as it is.</span>`;
+    else {
+      const top = fixList.filter(([k]) => k !== "__RISK").slice(0, 3).map(([k]) => `<b>${esc((ISSUE_LABELS[k] || k).toLowerCase())}</b>`);
+      html = `<span>${fmt.format(invalid + risk)} of ${fmt.format(total)} shipments can't be filed yet.${top.length ? ` The most common problems are ${top.join(", ")}.` : ""}${risk ? ` <b>${fmt.format(risk)}</b> need risk mitigation before filing.` : ""}</span>`;
+    }
+    $("bandText").innerHTML = html;
+  }
+
+  // ---------------------------------------------------------------- CSV
+
+  function resultsCsv() {
+    const cols = ["internal_reference", "status", "traces_status", "reference_number", "verification_number", "uuid", "commodity", "hs_heading", "net_weight_kg", "risk_level", "problem"];
+    const q = (v) => { const s = String(v ?? ""); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+    const lines = [cols.join(",")];
+    for (const r of rows()) {
+      const s = stmtOf(r), c0 = s && s.commodities[0];
+      const problem = r.error || r.gate || (r.issues || []).filter((i) => i.level === "error").map((i) => ISSUE_LABELS[i.code] || i.code).join("; ");
+      lines.push([r.ref, STATE_LABELS[r.state] || r.state, r.traces, r.reference, r.verification, r.uuid, commodityOf(r), c0 && c0.hs_heading, c0 && c0.net_weight, s && s.risk && s.risk.level, problem].map(q).join(","));
+    }
+    return lines.join("\n");
+  }
+
+  async function copyText(text, msgEl, label) {
+    try { await navigator.clipboard.writeText(text); msgEl.textContent = `${label} copied.`; return true; }
+    catch (e) { msgEl.textContent = "Copying is blocked here; select the text below and copy it."; return false; }
+  }
+
+  // ---------------------------------------------------------------- events
+
+  $("loadSample").addEventListener("click", loadSample);
+  $("reset").addEventListener("click", () => { stopPolling(); sandbox = null; sourceLabel = ""; selected = null; $("statusLine").dataset.last = ""; $("csvBox").hidden = true; render(); });
+  $("file").addEventListener("change", (e) => { loadFiles(e.target.files); e.target.value = ""; });
+  const drop = $("drop");
+  ["dragenter", "dragover"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave", "drop"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", (e) => loadFiles(e.dataTransfer.files));
+  $("submit").addEventListener("click", () => { $("statusLine").dataset.last = ""; fileAll(); });
+  $("faultRate").addEventListener("input", (e) => { $("faultOut").textContent = `${e.target.value}%`; syncMock(); });
+  $("rejectRate").addEventListener("input", (e) => { $("rejectOut").textContent = `${e.target.value}%`; syncMock(); });
+
+  $("filters").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-filter]");
+    if (!b) return;
+    filter = b.dataset.filter; shown = PAGE; renderTable();
+  });
+  $("filters").addEventListener("input", (e) => {
+    if (e.target.id !== "search") return;
+    query = e.target.value; shown = PAGE;
+    const pos = e.target.selectionStart;
+    renderTable();
+    const s = $("search"); s.focus(); s.setSelectionRange(pos, pos);
+  });
+  const pick = (tr) => { if (!tr) return; selected = tr.dataset.ref; renderTable(); renderDetail(); $("detail").scrollIntoView({ behavior: "smooth", block: "nearest" }); };
+  $("rows").addEventListener("click", (e) => pick(e.target.closest("tr[data-ref]")));
+  $("rows").addEventListener("keydown", (e) => { if (e.key === "Enter") pick(e.target.closest("tr[data-ref]")); });
+  $("moreBtn").addEventListener("click", () => { shown += PAGE; renderTable(); });
+  $("copyCsv").addEventListener("click", async () => {
+    if (!rows().length) { $("csvMsg").textContent = "Load a file first."; return; }
+    const csv = resultsCsv();
+    const okCopy = await copyText(csv, $("csvMsg"), `${fmt.format(rows().length)} rows`);
+    const box = $("csvBox");
+    box.value = csv; box.hidden = okCopy;
+    if (!okCopy) box.select();
+  });
+  $("detail").addEventListener("click", async (e) => {
+    const r = selected && sandbox.ledger.get(selected);
+    if (!r) return;
+    if (e.target.id === "copyXml") copyText($("xml").textContent, e.target, "XML").then(() => (e.target.textContent = "Copied"));
+    if (e.target.id === "copyNums") copyText(`${r.reference} ${r.verification}`, $("detailMsg"), "Reference and verification numbers");
+    if (e.target.id === "withdraw") {
+      if (e.target.dataset.confirm !== "1") { e.target.dataset.confirm = "1"; e.target.textContent = "Confirm withdrawal"; return; }
+      try { await sandbox.withdraw(r.ref); } catch (err) { $("detailMsg").textContent = err.message; return; }
+      render();
+    }
+  });
+
+  loadSample();
+})();
+</script>

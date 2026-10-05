@@ -139,6 +139,23 @@ enumerations and limits against the official XSD and *Validation Rules* page, us
 the acceptance environment. In particular, check operatorRole values, the maximum
 GeoJSON size, the maximum UUIDs per getDds call (`poll_batch`, default 50) and rate limits.
 
+## Browser sandbox
+
+`web/` holds a single-page version of the sandbox for people who shouldn't need a
+terminal. A DEFORRO export is loaded and processed entirely in the browser tab: pre-flight,
+risk gate, WS-Security signing, filing to an in-page mock TRACES, polling and results.
+Files are never uploaded anywhere.
+
+* `web/engine.js`: JavaScript port of the loaders, validation, SOAP builder, mock and uploader
+* `web/sandbox.html`: the page (the engine is inlined at build time)
+* `python web/build.py` writes `web/dist/deforro-dds-sandbox.html`, which you can open
+  from disk or publish
+
+`tests/test_web_parity.py` runs the JavaScript engine under Node against the same inputs
+as this package: validation outcomes on 30 edge cases and 400 generated records, the CSV
+example, the password digest, and the SOAP body field by field. It fails if the two
+implementations disagree, so change both together.
+
 ## Tests
 
 ```bash
